@@ -1,0 +1,4 @@
+DB Interaction: https://aiopg.readthedocs.io/en/stable/
+                https://docs.sqlalchemy.org/en/14/core/index.html
+                Dev: https://hub.docker.com/_/postgres
+

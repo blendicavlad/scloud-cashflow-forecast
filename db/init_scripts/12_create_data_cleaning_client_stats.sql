@@ -1,0 +1,20 @@
+create table machine_learning.data_cleaning_client_stats (
+    ml_client_stats_id SERIAL PRIMARY KEY,
+    ad_client_id bigint,
+    date_run timestamp(0) default current_timestamp::timestamp,
+    runtime_in_seconds numeric,
+    no_entries_invoices bigint,
+    no_entries_alloc bigint,
+    no_entries_payments bigint,
+    no_entries_terms bigint,
+    no_clean_entries_invoices bigint,
+    no_clean_entries_alloc bigint,
+    no_clean_entries_payments bigint,
+    no_clean_entries_terms bigint,
+    invoices_remaining_percent numeric,
+    alloc_remaining_percent numeric,
+    payments_remaining_percent numeric,
+    terms_remaining_percent numeric,
+    avg_remaining_percent numeric,
+    no_total_aggregated_rows numeric
+)

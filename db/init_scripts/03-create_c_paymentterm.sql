@@ -1,0 +1,46 @@
+create table machine_learning.c_paymentterm
+(
+    c_paymentterm_id        bigint                                 not null
+        constraint pk113
+            primary key,
+    ad_client_id            bigint                                 not null,
+    ad_org_id               bigint                                 not null,
+    isactive                char         default 'Y'::bpchar       not null,
+    created                 timestamp(0) default clock_timestamp() not null,
+    createdby               bigint       default (0)::bigint       not null,
+    updated                 timestamp(0) default clock_timestamp() not null,
+    updatedby               bigint       default (0)::bigint       not null,
+    name                    varchar(60)                            not null,
+    description             varchar(255),
+    documentnote            varchar(2000),
+    afterdelivery           char         default 'N'::bpchar       not null,
+    isduefixed              char         default 'N'::bpchar       not null,
+    netdays                 bigint       default (0)::bigint       not null,
+    gracedays               bigint       default (0)::bigint       not null,
+    fixmonthcutoff          bigint,
+    fixmonthday             bigint,
+    fixmonthoffset          bigint,
+    discountdays            bigint       default (0)::bigint       not null,
+    discount                numeric      default (0)::numeric      not null,
+    discountdays2           bigint       default (0)::bigint       not null,
+    discount2               numeric      default (0)::numeric      not null,
+    isnextbusinessday       char         default 'N'::bpchar,
+    isdefault               char         default 'N'::bpchar,
+    value                   varchar(40)                            not null,
+    netday                  char,
+    isvalid                 char         default 'N'::bpchar       not null,
+    processing              char         default 'N'::bpchar,
+    isfixeddate             char         default 'N'::bpchar,
+    duedate                 timestamp(0) default NULL::timestamp without time zone,
+    isgeneratedbyso         char         default 'N'::bpchar,
+    isendofmonthpaymentterm char         default 'N'::bpchar,
+    daysafterendofmonth     bigint       default (0)::bigint,
+    isgeneratescheduleondoc char         default 'N'::bpchar,
+    producttobeinvoiced_id  bigint,
+    discount3               numeric      default 0                 not null,
+    discountdays3           bigint       default 0                 not null,
+    producttobeinvoiced2_id bigint,
+    producttobeinvoiced3_id bigint
+);
+
+

@@ -1,0 +1,7 @@
+test-data-s3:
+  bucket: s3a://scloud-poc-cflow-ml/
+  files:
+    allocations: c_allocationline.txt
+    invoices: c_invoice.txt
+    payments: c_payment.txt
+    payment_terms: c_paymentterm.txt
