@@ -5,4 +5,4 @@ services:
     ports:
     - "5000:5000"
     env_file:
-      - ./prod.env
+      - env/data-cleaning/prod.env

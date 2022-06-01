@@ -1,5 +1,0 @@
-1. for de ad_client_id si rulezi tot procesul pt fiecare ad_client
-2. de pus parametru de ad_client_id in constructorul fiecarui pipeline
-3. de adaugat ad_client la filtrele fiecarui pipeline
-4. de adaugat rezultatul final merged in DB
-5. de redenumit variabile/functii in merge_pipeline ca sa fie mai explicite

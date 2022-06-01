@@ -1,4 +1,4 @@
-# data-cleaning-service
+# scloud-cashflow-forecast
 
 
 
@@ -15,3 +15,4 @@ run ` docker-compose -f docker-compose.dev.yml up ` to update and run the dev co
 run ` docker-compose up ` to update and run the prod container
 
 to download the test data, you must set env variables
+don't forget to set up a remote docker python interpreter from the IDE
