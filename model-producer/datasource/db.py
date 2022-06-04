@@ -2,7 +2,7 @@ import psycopg2
 import logging
 import time
 
-logger = logging.getLogger('appLog')
+logger = logging.getLogger('modelProducerLog')
 
 LIMIT_RETRIES = 5
 

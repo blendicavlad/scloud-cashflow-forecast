@@ -1,21 +1,23 @@
-from utils import log
-from service import data_cleaning_service
 import logging
 
+from service import pipeline_runner
+from utils import log
+
 log.setup_logging()
-logger = logging.getLogger('appLog')
-    
+logger = logging.getLogger('modelProducerLog')
+
 
 def call_service():
-    cleaner_service = data_cleaning_service.DataCleaningService()
-    state_map = cleaner_service.run()
+    logger.info('Service started')
+    runner = pipeline_runner.PipelineRunner()
+    state_map = runner.run()
     ret_map = {}
     for k, v in state_map.items():
         if v is True:
             ret_map[k] = "Success"
         else:
             ret_map[k] = "False"
-    return ret_map
+    logger.info(str(state_map))
 
 
 if __name__ == "__main__":

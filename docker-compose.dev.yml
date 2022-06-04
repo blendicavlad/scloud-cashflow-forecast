@@ -21,12 +21,27 @@ services:
     build:
       context: ./model-consumer
       dockerfile: Dockerfile
-    ports:
-      - "5001:5001"
     env_file:
       - ./env/model-consumer/dev.env
     volumes:
       - ./model-consumer:/app
+      - ./ml-models:/app/ml-models
+
+  model-producer:
+    container_name: model-producer
+    build:
+      context: ./model-producer
+      dockerfile: Dockerfile
+    links:
+      - data_cleaning_db:data_cleaning_db
+    env_file:
+      - ./env/model-producer/dev.env
+    volumes:
+      - ./model-producer:/app
+      - ./ml-models:/app/ml-models
+      - ./client-plots:/app/client-plots
+    networks:
+      - app-network
 
   dev_db:
     container_name: dev_db

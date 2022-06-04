@@ -24,8 +24,10 @@ class DataCleaningService:
         cpus = multiprocessing.cpu_count()
         logger.info('Worker cpus: ' + str(cpus))
 
-        self.data_cleaning_db_api = DB_Interface(DataCleaningDB())
-        self.source_db_api = DB_Interface(SourceDB())
+        self.data_cleaning_db = DataCleaningDB()
+        self.source_db = SourceDB()
+        self.data_cleaning_db_api = DB_Interface(self.data_cleaning_db)
+        self.source_db_api = DB_Interface(self.source_db)
         self.workers = cpus if cpus <= len(Pipeline) else len(Pipeline)
 
     def run(self) -> dict[int, bool]:
@@ -49,6 +51,8 @@ class DataCleaningService:
 
         if pipeline_state_list:
             PipelineState.persist_pipeline_state_list(self.data_cleaning_db_api, pipeline_state_list)
+        self.source_db.close()
+        self.data_cleaning_db.close()
         return state_map
 
     def run_for_ad_client(self, ad_client_id: int, queue: Queue) -> bool:
