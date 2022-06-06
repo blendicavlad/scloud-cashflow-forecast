@@ -21,11 +21,17 @@ services:
     build:
       context: ./model-consumer
       dockerfile: Dockerfile
+    depends_on:
+      - data_cleaning_db
+    ports:
+      - "5000:5000"
     env_file:
       - ./env/model-consumer/dev.env
     volumes:
       - ./model-consumer:/app
-      - ./ml-models:/app/ml-models
+      - ./model-producer/ml-models:/app/ml-models
+    networks:
+      - app-network
 
   model-producer:
     container_name: model-producer

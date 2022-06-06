@@ -36,10 +36,10 @@ class RegressionPipeline(MLPipeline):
 
     def __init__(self, df: DataFrame, ad_client_id: int):
         super().__init__(ad_client_id)
-        self.__numeric_features = [c for c in MLPipeline.features if df[c].dtype != object]
-        self.__categorical_features = [c for c in MLPipeline.features if df[c].dtype == object]
         self.__features = [f for f in MLPipeline.features if
                            f not in [ClassificationPipeline.target, RegressionPipeline.target]]
+        self.__numeric_features = [c for c in self.__features if df[c].dtype != object]
+        self.__categorical_features = [c for c in self.__features if df[c].dtype == object]
         self.__cols_reg = self.__numeric_features + self.__categorical_features + [self.target, self.target,
                                                                                    'dateinvoiced']
         self.__data = df

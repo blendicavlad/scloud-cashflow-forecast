@@ -4,10 +4,9 @@ import pickle
 import warnings
 from datetime import timedelta
 
+import pandas
 from pandas import DataFrame
-from imblearn.ensemble import BalancedRandomForestClassifier
 from pandas.core.common import SettingWithCopyWarning
-
 from sklearn.model_selection import GridSearchCV
 from datetime import datetime
 from sklearn.metrics import confusion_matrix, RocCurveDisplay
@@ -18,18 +17,20 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import metrics
 import pandas as pd
-# import matplotlib.pyplot as plt
 from sklearn.svm import LinearSVC
 
 from .ml_pipeline import MLPipeline
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore',category=SettingWithCopyWarning)
+warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
+warnings.simplefilter(action='ignore', category=UserWarning)
 
 logger = logging.getLogger('modelProducerLog')
 
-class ClassificationPipeline(MLPipeline):
+logging.getLogger('matplotlib.font_manager').disabled = True
 
+
+class ClassificationPipeline(MLPipeline):
     target = 'paid'
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value=0)),
@@ -43,7 +44,34 @@ class ClassificationPipeline(MLPipeline):
         self.__features = MLPipeline.features
         self.__numeric_features = [c for c in self.__features if df[c].dtype != object]
         self.__categorical_features = [c for c in self.__features if df[c].dtype == object]
-        self.__data = df
+        #distribute the data evenly based on the values of the target feature so that linear models would have an even distribution of classes
+        self.__data = self.distribute_data(df)
+
+    @staticmethod
+    def distribute_data(df):
+        df1 = df[df.paid == 1]
+        df2 = df[df.paid == 0]
+        if len(df2) > len(df1):
+            bigger_len = len(df2)
+            lesser_len = len(df1)
+        else:
+            bigger_len = len(df1)
+            lesser_len = len(df2)
+        step = round(bigger_len / (lesser_len - 1))
+        if step == 1:  # if step is 1 then the data is already evenly distributed
+            ret = df
+        else:
+            df2ind = range(0, (lesser_len - 1) * (step + 1) + 1, step + 1)
+
+            df1ind = [range(i + 1, i + 1 + step) for i in df2ind]
+            df1ind = [i for l in df1ind for i in l][:bigger_len]
+
+            df1.index = df1ind
+            df2.index = df2ind
+            ret = pandas.concat([df1, df2]).sort_index()
+        del df1
+        del df2
+        return ret
 
     def run(self) -> bool:
         logger.info(f'Started classification pipeline for client: {self.ad_client_id}')
@@ -55,18 +83,26 @@ class ClassificationPipeline(MLPipeline):
         self.persist_model(model)
 
         logger.info('Classification model persisted successfully')
+
         return True
 
-    def split_for_test(self, n_years = 1):
-        # pentru clasificare
+    def split_for_test(self, n_years=1):
         features = self.__numeric_features + self.__categorical_features
-        x_train = self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][features]
-        y_train = self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][self.target]
+        x_train = \
+        self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+            features]
+        y_train = \
+        self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+            self.target]
 
-        x_test = self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][features]
-        y_test = self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][self.target]
+        x_test = \
+        self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
+                        days=-365 * (n_years - 1)))][features]
+        y_test = \
+        self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
+                        days=-365 * (n_years - 1)))][self.target]
         return x_train, y_train, x_test, y_test
 
     def split_for_train(self):
@@ -83,7 +119,17 @@ class ClassificationPipeline(MLPipeline):
         param_grid = [
             {'classifier': [RandomForestClassifier()],
              'classifier__n_estimators': [10, 100, 500],
-             'classifier__max_samples': [0.1, 0.2, 0.3]}
+             'classifier__max_samples': [0.1, 0.2, 0.3],
+             'classifier__class_weight': ['balanced']
+             },
+            {
+                'classifier': [LinearSVC()],
+                'classifier__penalty': ['l2'],
+                'classifier__random_state': [0],
+                'classifier__dual': [False],
+                'classifier__class_weight': ['balanced'],
+                'classifier__max_iter': [10000]
+            }
         ]
 
         result_list = []
@@ -104,7 +150,8 @@ class ClassificationPipeline(MLPipeline):
                 except OSError as error:
                     logger.error(str(error))
             current_dt = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-            plt.savefig(f"client-plots/{self.ad_client_id}/{str(type(classifier_params['classifier'][0]).__name__)}_{current_dt}.png")
+            plt.savefig(
+                f"client-plots/{self.ad_client_id}/{str(type(classifier_params['classifier'][0]).__name__)}_{current_dt}.png")
 
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
 
