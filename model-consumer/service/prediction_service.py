@@ -1,7 +1,3 @@
-import glob
-import os
-import pickle
-from enum import Enum
 from typing import List
 
 from datasource.db import DB
@@ -9,14 +5,10 @@ from datasource.db_api import DB_Interface
 from datasource.db_props import DATA_CLEANING_USER, DATA_CLEANING_PASSWORD, DATA_CLEANING_DATABASE, DATA_CLEANING_HOST, \
     DATA_CLEANING_PORT, DATA_CLEANING_SCHEMA
 import pandas as pd
+from .model_type import ModelType
+from .file_service import retrieve_model
 
 from pandas import DataFrame
-
-
-class ModelType(Enum):
-    REGRESSION = 'regression',
-    CLASSIFICATION = 'classification'
-
 
 features = ['closed_late_invoices_no',
             'paid_late_percent',
@@ -58,9 +50,9 @@ def predict(df: DataFrame, ad_client_id):
     df['daystosettle_prediction'] = regression_result
 
     df['daystosettle_prediction'] = df[['daystosettle_prediction', 'paid_prediction']].apply(lambda x:
-                                                             0 if x[1] == 0
-                                                             else round(x[0], 0),
-                                                             axis=1)
+                                                                                             0 if x[1] == 0
+                                                                                             else round(x[0], 0),
+                                                                                             axis=1)
 
     return df
 
@@ -80,22 +72,12 @@ def get_classification_result(df: DataFrame, ad_client_id):
 
 
 def run_model(df: DataFrame, ad_client_id: int, _type: ModelType):
-    model = retrieve_model(_type, ad_client_id)
+    model = _retrieve_model(_type, ad_client_id)
     return model.predict(df)
 
 
-def retrieve_model(_type, ad_client_id):
-    if _type == ModelType.REGRESSION:
-        path = f'ml-models/regression_models/{ad_client_id}'
-    else:
-        path = f'ml-models/classification_models/{ad_client_id}'
-    if not os.path.isdir(path):
-        raise Exception(f"No {ModelType.REGRESSION.value[0]} model for client: {ad_client_id}")
-    list_of_files = filter(os.path.isfile,
-                           glob.glob(path + '/*'))
-    model_file = max(list_of_files, key=os.path.getctime)
-    model = pickle.load(open(model_file, 'rb'))
-    return model
+def _retrieve_model(_type, ad_client_id):
+    return retrieve_model(ad_client_id, _type)
 
 
 def build_derived_features(df: DataFrame):

@@ -29,7 +29,8 @@ services:
       - ./env/model-consumer/prod.env
     volumes:
       - ./model-consumer:/app
-      - ./model-producer/ml-models:/app/ml-models
+    tmpfs:
+      - /tmp
     networks:
       - app-network
 
@@ -44,8 +45,8 @@ services:
       - ./env/model-producer/prod.env
     volumes:
       - ./model-producer:/app
-      - ./ml-models:/app/ml-models
-      - ./client-plots:/app/client-plots
+    tmpfs:
+      - /tmp
     networks:
       - app-network
 

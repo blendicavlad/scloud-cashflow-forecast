@@ -1,6 +1,4 @@
 import logging
-import os
-import pickle
 import warnings
 from datetime import timedelta
 
@@ -8,8 +6,7 @@ import pandas
 from pandas import DataFrame
 from pandas.core.common import SettingWithCopyWarning
 from sklearn.model_selection import GridSearchCV
-from datetime import datetime
-from sklearn.metrics import confusion_matrix, RocCurveDisplay
+from sklearn.metrics import RocCurveDisplay
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -19,7 +16,8 @@ from sklearn import metrics
 import pandas as pd
 from sklearn.svm import LinearSVC
 
-from .ml_pipeline import MLPipeline
+from . import file_service
+from .ml_pipeline import MLPipeline, PipelineType
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
@@ -44,7 +42,7 @@ class ClassificationPipeline(MLPipeline):
         self.__features = MLPipeline.features
         self.__numeric_features = [c for c in self.__features if df[c].dtype != object]
         self.__categorical_features = [c for c in self.__features if df[c].dtype == object]
-        #distribute the data evenly based on the values of the target feature so that linear models would have an even distribution of classes
+        # distribute the data evenly based on the values of the target feature so that linear models would have an even distribution of classes
         self.__data = self.distribute_data(df)
 
     @staticmethod
@@ -89,20 +87,24 @@ class ClassificationPipeline(MLPipeline):
     def split_for_test(self, n_years=1):
         features = self.__numeric_features + self.__categorical_features
         x_train = \
-        self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
-            features]
+            self.__data[
+                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+                features]
         y_train = \
-        self.__data[self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
-            self.target]
+            self.__data[
+                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+                self.target]
 
         x_test = \
-        self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
-                        days=-365 * (n_years - 1)))][features]
+            self.__data[
+                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+                (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
+                    days=-365 * (n_years - 1)))][features]
         y_test = \
-        self.__data[(self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                    (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
-                        days=-365 * (n_years - 1)))][self.target]
+            self.__data[
+                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+                (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
+                    days=-365 * (n_years - 1)))][self.target]
         return x_train, y_train, x_test, y_test
 
     def split_for_train(self):
@@ -144,15 +146,8 @@ class ClassificationPipeline(MLPipeline):
 
             display = RocCurveDisplay.from_estimator(grid.best_estimator_, x_test, y_test)
             plt = display.figure_
-            if not os.path.isdir(f'client-plots/{self.ad_client_id}'):
-                try:
-                    os.mkdir(f'client-plots/{self.ad_client_id}')
-                except OSError as error:
-                    logger.error(str(error))
-            current_dt = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-            plt.savefig(
-                f"client-plots/{self.ad_client_id}/{str(type(classifier_params['classifier'][0]).__name__)}_{current_dt}.png")
-
+            file_service.persist_classifier_plot(plt, str(type(classifier_params['classifier'][0]).__name__),
+                                                 self.ad_client_id)
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
 
             model_state = {
@@ -215,11 +210,4 @@ class ClassificationPipeline(MLPipeline):
         return grid
 
     def persist_model(self, model):
-        super().persist_model(model)
-        if not os.path.isdir(f'ml-models/classification_models/{self.ad_client_id}'):
-            try:
-                os.mkdir(f'ml-models/classification_models/{self.ad_client_id}')
-            except OSError as error:
-                logger.error(str(error))
-        current_dt = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-        pickle.dump(model, open(f'ml-models/classification_models/{self.ad_client_id}/{current_dt}.sav', 'wb'))
+        file_service.persist_model(PipelineType.CLASSIFICATION, model, self.ad_client_id)

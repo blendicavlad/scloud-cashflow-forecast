@@ -1,5 +1,4 @@
 import os
-import traceback
 
 from flask import Flask, render_template, request, jsonify
 from utils import log
@@ -13,8 +12,10 @@ logger = logging.getLogger('modelConsumerLog')
 
 ALLOWED_EXTENSIONS = {'csv'}
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @app.route('/index', methods=['GET'])
 def index():

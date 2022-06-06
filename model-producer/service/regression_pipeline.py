@@ -1,28 +1,26 @@
 import logging
-import os
-from datetime import timedelta
-import pandas as pd
 import numpy as np
 from pandas.core.common import SettingWithCopyWarning
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder
 from sklearn.impute import SimpleImputer
 
 from sklearn.linear_model import Lasso, LassoCV
 from sklearn.metrics import mean_squared_error
-from datetime import timedelta, datetime
-import pickle
+from datetime import timedelta
 from pandas import DataFrame
 
-from .ml_pipeline import MLPipeline
+from . import file_service
+from .ml_pipeline import MLPipeline, PipelineType
 from .classification_pipeline import ClassificationPipeline
 import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
-warnings.simplefilter(action='ignore',category=SettingWithCopyWarning)
+warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
 
 logger = logging.getLogger('modelProducerLog')
+
 
 class RegressionPipeline(MLPipeline):
     target = 'daystosettle'
@@ -56,22 +54,22 @@ class RegressionPipeline(MLPipeline):
 
         return True
 
-    def split_for_test(self, n_years = 1):
+    def split_for_test(self, n_years=1):
         df = self.__data
         features = self.__numeric_features + self.__categorical_features
         x_train = df[(df.paid == 1) &
-                         (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][
+                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][
             features]
         y_train = df[(df.paid == 1) &
-                         (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][self.target]
+                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][self.target]
 
         x_test = \
-        df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-           (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][features]
+            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+               (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][features]
 
         y_test = \
-        df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-           (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][self.target]
+            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
+               (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][self.target]
 
         x_train.fillna(value=x_train.mean(), inplace=True)
         y_train.fillna(value=y_train.mean(), inplace=True)
@@ -99,7 +97,6 @@ class RegressionPipeline(MLPipeline):
         logger.info("MSE of test data :" + str(cv_alpha_test_error))
         logger.info("R^2 of test data: {0}".format(model.score(x_test, y_test)))
 
-
     def build_model(self, x_train, y_train):
         df = self.__data[self.__cols_reg].reset_index()
         cols = [c for c in df if
@@ -122,7 +119,7 @@ class RegressionPipeline(MLPipeline):
                      [list(df[cols].columns.values).index(e) for e in self.__categorical_features])],
                 remainder='passthrough'
             )
-            )])
+             )])
 
         lambda_values = 10 ** np.linspace(10, -3, 100) * 0.5
         x_train_transform = data_transformer.fit_transform(x_train)
@@ -162,11 +159,4 @@ class RegressionPipeline(MLPipeline):
         return model
 
     def persist_model(self, model):
-        super().persist_model(model)
-        if not os.path.isdir(f'ml-models/regression_models/{self.ad_client_id}'):
-            try:
-                os.mkdir(f'ml-models/regression_models/{self.ad_client_id}')
-            except OSError as error:
-                logger.error(str(error))
-        current_dt = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-        pickle.dump(model, open(f'ml-models/regression_models/{self.ad_client_id}/{current_dt}.sav', 'wb'))
+        file_service.persist_model(PipelineType.REGRESSION, model, self.ad_client_id)
