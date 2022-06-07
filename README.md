@@ -2,7 +2,7 @@
 
 Machine learning service for SorcrateCloud ERP 
 
-purpose: predicts if an invoice or batch of invoices will be paid and in how much time in days
+purpose: predicts if an invoice or batch of invoices will be paid and in how much time in days, the predictions can be further used to calculate a predicted cash-flow for a given time period
 
 run init-compose.sh when you firstly initialize the app and test data
 - must have AWS credentials set in the .aws/credentials file to download the test data
