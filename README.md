@@ -40,3 +40,10 @@ The given csv must contain the following fields:
 The response is a json containing all the given columns plus:
 - paid: the prediction if the given invoice will be paid 1=True, 0=False
 - daystosettle_pred: the prediction of the time period in days until the invoice will be paid
+
+TODO: 
+- implemet Loggly hooks
+- change default server implementation of model-consumer (currently using the flask default implementation, which is not suitable for production use)
+- implement nginx reverse proxy as container
+- maybe add terraform infrastructure-as-code for easier deployment and CI-CD
+- integration/unit tests
