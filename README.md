@@ -3,7 +3,7 @@
 Machine learning service for Sorcrate ERP Cloud ERP
 
 run init-compose.sh when you firstly initialize the app and test data
-- must have AWS credentials set in the .aws/credentials file, to download the test data
+- must have AWS credentials set in the .aws/credentials file to download the test data
   - `aws_access_key_id={}`
   - `aws_secret_access_key={}`
 - dev mode also builds a postgres image with test data and tables (data insertion should take around 30 mins)
@@ -14,11 +14,15 @@ run ` docker-compose up ` to update and run the prod container
 
 to download the test data, you must set aws creds env variables
 
-the prod app is made of 5 docker services:
+the prod app is made of 4 docker services:
 - data_cleaning_db: postgres container used as a data lake
 - data-cleaning: run as a AWS ECS Task triggered by a scheduled CloudWatch Event -> starts data_cleaning_db postgres container which acts as a data lake for the processed and aggregated data for each client and business partner
-- model-producer: run as a AWS ECS Task triggered by a scheduled CloudWatch Event, after data-cleaning task has been run -> uses the data from data_cleaning_db to build predictive regression and classification models after probing for the best one for each client and uploads them to AWS S3
+- model-producer: run as a AWS ECS Task triggered by a scheduled CloudWatch Event, after data-cleaning task has been run -> uses the data from data_cleaning_db to build predictive regression and classification models after probing for the best one for each client and uploads them and the plots of the ROC curve of every client to AWS S3
 - model-consumer: run as a EC2 app or Lambda function -> accepts a csv file in a multi-part request and an ad_client_id as request parameter -> retrieves the models for the given client and the data from the data-lake for the business partners of the given invoices and returns the prediction data response as a list of JSON objects for each given invoice.
+
+the dev app is made of the containers mentioned above, plus:
+- dev_db: database that automatically initializes with the required tables and test data downloaded from S3 by init-compose.sh, to simulate a production environment
+- jupyter: jupyter notebook for fast prototyping, testing and plotting 
 
 The given csv must contain the following fields:
 - c_invoice_id: id of the invoice -> int64
