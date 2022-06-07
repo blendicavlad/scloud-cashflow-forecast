@@ -1,6 +1,8 @@
 # scloud-cashflow-forecast
 
-Machine learning service for Sorcrate ERP Cloud ERP that predicts if an invoice or batch of invoices will be paid and in how much time in days
+Machine learning service for SorcrateCloud ERP 
+
+purpose: predicts if an invoice or batch of invoices will be paid and in how much time in days
 
 run init-compose.sh when you firstly initialize the app and test data
 - must have AWS credentials set in the .aws/credentials file to download the test data
