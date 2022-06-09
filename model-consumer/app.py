@@ -5,10 +5,19 @@ from utils import log
 from service import prediction_service
 import pandas as pd
 import logging.config
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+sentry_sdk.init(
+    dsn=os.environ.get('SENTRY_KEY'),
+    integrations=[FlaskIntegration()],
+    traces_sample_rate=1.0
+)
 
 app = Flask(__name__, template_folder='templates')
 log.setup_logging()
 logger = logging.getLogger('modelConsumerLog')
+logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 ALLOWED_EXTENSIONS = {'csv'}
 

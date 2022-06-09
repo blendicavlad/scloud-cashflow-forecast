@@ -1,16 +1,24 @@
 import logging
-import time
+import os
 
 from service import pipeline_runner
 from utils import log
-from service import file_service
+import sentry_sdk
+
 
 log.setup_logging()
 logger = logging.getLogger('modelProducerLog')
+logging.getLogger('boto').setLevel(logging.CRITICAL)
+
+sentry_sdk.init(
+    os.environ.get('SENTRY_KEY'),
+    traces_sample_rate=1.0
+)
 
 
 def call_service():
     logger.info('Service started')
+    logger.info('test')
     runner = pipeline_runner.PipelineRunner()
     state_map = runner.run()
     ret_map = {}

@@ -3,6 +3,8 @@ import warnings
 from datetime import timedelta
 
 import pandas
+import time
+import datetime
 from pandas import DataFrame
 from pandas.core.common import SettingWithCopyWarning
 from sklearn.model_selection import GridSearchCV
@@ -15,6 +17,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn import metrics
 import pandas as pd
 from sklearn.svm import LinearSVC
+from sentry_sdk import start_span
 
 from . import file_service
 from .ml_pipeline import MLPipeline, PipelineType
@@ -59,13 +62,13 @@ class ClassificationPipeline(MLPipeline):
         if step == 1:  # if step is 1 then the data is already evenly distributed
             ret = df
         else:
-            df2ind = range(0, (lesser_len - 1) * (step + 1) + 1, step + 1)
+            df2_idx = range(0, (lesser_len - 1) * (step + 1) + 1, step + 1)
 
-            df1ind = [range(i + 1, i + 1 + step) for i in df2ind]
-            df1ind = [i for l in df1ind for i in l][:bigger_len]
+            df1_idx = [range(i + 1, i + 1 + step) for i in df2_idx]
+            df1_idx = [i for idx_range in df1_idx for i in idx_range][:bigger_len]
 
-            df1.index = df1ind
-            df2.index = df2ind
+            df1.index = df1_idx
+            df2.index = df2_idx
             ret = pandas.concat([df1, df2]).sort_index()
         del df1
         del df2
@@ -74,9 +77,15 @@ class ClassificationPipeline(MLPipeline):
     def run(self) -> bool:
         logger.info(f'Started classification pipeline for client: {self.ad_client_id}')
 
-        best_params = self.evaluate_classifiers(*self.split_for_test())
+        with start_span(op="classifier_evaluation", description="Classifier evaluation") as span:
+            start_time = time.time()
+            best_params = self.evaluate_classifiers(*self.split_for_test())
+            span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
 
-        model = self.build_model(best_params, *self.split_for_train())
+        with start_span(op="classifier_model_building", description="Classification model building") as span:
+            start_time = time.time()
+            model = self.build_model(best_params, *self.split_for_train())
+            span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
 
         self.persist_model(model)
 
@@ -118,6 +127,7 @@ class ClassificationPipeline(MLPipeline):
         return x_train, y_train
 
     def evaluate_classifiers(self, x_train, y_train, x_test, y_test):
+
         param_grid = [
             {'classifier': [RandomForestClassifier()],
              'classifier__n_estimators': [10, 100, 500],
@@ -146,8 +156,9 @@ class ClassificationPipeline(MLPipeline):
 
             display = RocCurveDisplay.from_estimator(grid.best_estimator_, x_test, y_test)
             plt = display.figure_
-            file_service.persist_classifier_plot(plt, str(type(classifier_params['classifier'][0]).__name__),
-                                                 self.ad_client_id)
+            file_service.persist_classifier_plot(plot=plt, pipeline_type=PipelineType.CLASSIFICATION,
+                                                 classifier_name=str(type(classifier_params['classifier'][0]).__name__),
+                                                 ad_client_id=self.ad_client_id)
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
 
             model_state = {

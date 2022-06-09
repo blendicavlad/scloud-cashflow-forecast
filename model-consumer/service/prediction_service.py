@@ -1,3 +1,5 @@
+import datetime
+import time
 from typing import List
 
 from datasource.db import DB
@@ -7,6 +9,7 @@ from datasource.db_props import DATA_CLEANING_USER, DATA_CLEANING_PASSWORD, DATA
 import pandas as pd
 from .model_type import ModelType
 from .file_service import retrieve_model
+from sentry_sdk import start_transaction, start_span
 
 from pandas import DataFrame
 
@@ -38,21 +41,23 @@ def predict(df: DataFrame, ad_client_id):
 
     """
     agg_data = get_aggregated_data_for_bpartners(df['c_bpartner_id'].tolist())
-    if agg_data.empty:
-        raise Exception('No model generated for the provided BPartners')
-    joined_data = join_data(df, agg_data)
-    build_derived_features(joined_data)
 
-    classification_result = get_classification_result(joined_data, ad_client_id)
-    regression_result = get_regression_result(joined_data, ad_client_id)
+    with start_transaction(op="task", name="prediction_task"):
+        if agg_data.empty:
+            raise Exception('No model generated for the provided BPartners')
+        joined_data = join_data(df, agg_data, ad_client_id)
+        build_derived_features(joined_data, ad_client_id)
 
-    df['paid_prediction'] = classification_result
-    df['daystosettle_prediction'] = regression_result
+        classification_result = get_classification_result(joined_data, ad_client_id)
+        regression_result = get_regression_result(joined_data, ad_client_id)
 
-    df['daystosettle_prediction'] = df[['daystosettle_prediction', 'paid_prediction']].apply(lambda x:
-                                                                                             0 if x[1] == 0
-                                                                                             else round(x[0], 0),
-                                                                                             axis=1)
+        df['paid_prediction'] = classification_result
+        df['daystosettle_prediction'] = regression_result
+
+        df['daystosettle_prediction'] = df[['daystosettle_prediction', 'paid_prediction']].apply(lambda x:
+                                                                                                 0 if x[1] == 0
+                                                                                                 else round(x[0], 0),
+                                                                                                 axis=1)
 
     return df
 
@@ -80,24 +85,35 @@ def _retrieve_model(_type, ad_client_id):
     return retrieve_model(ad_client_id, _type)
 
 
-def build_derived_features(df: DataFrame):
-    df['dateinvoiced'] = pd.to_datetime(df.dateinvoiced)
-    df['duedate'] = pd.to_datetime(df.duedate)
-    df['dayslate'] = (df.dateinvoiced - df.duedate).dt.days
-    df['dayslate'] = df['dayslate'].apply(lambda x: 0 if x <= 0 else x)
-    df['late'] = df['dayslate'].apply(lambda x: 1 if x > 0 else 0)
-    df['paid'] = (df['grandtotal'] - df['paidamt']).apply(lambda x: 1 if x <= 0.01 else 0)
-    df['paid_late_sum'] = df.paidamt * df.late
-    df['closed_late_invoice'] = df[['late', 'paid']].apply(lambda t: 1 if t[0] == 1 and t[1] == 1 else 0, axis=1)
-    df['days_late_closed_invoices_late'] = df.dayslate * df.closed_late_invoice
-    df['invoice_late_unpaid'] = df.late * (1 - df.paid)
-    df['unpaid_sum'] = df['grandtotal'] - df['paidamt']
-    df['unpaid_late_sum'] = df['unpaid_sum'] * df.late
-    df['late_unpaid_invoices_sum_percent'] = df['unpaid_invoices_late_sum'] / df['unpaid_invoices_sum']
+def build_derived_features(df: DataFrame, ad_client_id: int):
+    with start_span(op="build_derived_features", description="Build derived features") as span:
+        start_time = time.time()
+        df['dateinvoiced'] = pd.to_datetime(df.dateinvoiced)
+        df['duedate'] = pd.to_datetime(df.duedate)
+        df['dayslate'] = (df.dateinvoiced - df.duedate).dt.days
+        df['dayslate'] = df['dayslate'].apply(lambda x: 0 if x <= 0 else x)
+        df['late'] = df['dayslate'].apply(lambda x: 1 if x > 0 else 0)
+        df['paid'] = (df['grandtotal'] - df['paidamt']).apply(lambda x: 1 if x <= 0.01 else 0)
+        df['paid_late_sum'] = df.paidamt * df.late
+        df['closed_late_invoice'] = df[['late', 'paid']].apply(lambda t: 1 if t[0] == 1 and t[1] == 1 else 0, axis=1)
+        df['days_late_closed_invoices_late'] = df.dayslate * df.closed_late_invoice
+        df['invoice_late_unpaid'] = df.late * (1 - df.paid)
+        df['unpaid_sum'] = df['grandtotal'] - df['paidamt']
+        df['unpaid_late_sum'] = df['unpaid_sum'] * df.late
+        df['late_unpaid_invoices_sum_percent'] = df['unpaid_invoices_late_sum'] / df['unpaid_invoices_sum']
+        span.set_data('df_size', df.shape[0])
+        span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
+        span.set_data('ad_client_id', ad_client_id)
 
 
-def join_data(df_for_pred: DataFrame, agg_df: DataFrame) -> DataFrame:
-    return df_for_pred.merge(agg_df, on=['ad_org_id', 'c_bpartner_id', 'c_bpartner_location_id'], how='inner')
+def join_data(df_for_pred: DataFrame, agg_df: DataFrame, ad_client_id: int) -> DataFrame:
+    with start_span(op="build_derived_features", description="Build derived features") as span:
+        start_time = time.time()
+        df = df_for_pred.merge(agg_df, on=['ad_org_id', 'c_bpartner_id', 'c_bpartner_location_id'], how='inner')
+        span.set_data('agg_df_size', agg_df.shape[0])
+        span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
+        span.set_data('ad_client_id', ad_client_id)
+        return df
 
 
 def get_aggregated_data_for_bpartners(c_bpartner_ids: List) -> DataFrame:

@@ -10,6 +10,9 @@ from sklearn.linear_model import Lasso, LassoCV
 from sklearn.metrics import mean_squared_error
 from datetime import timedelta
 from pandas import DataFrame
+from sentry_sdk import start_span
+import time
+import datetime
 
 from . import file_service
 from .ml_pipeline import MLPipeline, PipelineType
@@ -45,12 +48,20 @@ class RegressionPipeline(MLPipeline):
     def run(self) -> bool:
         logger.info(f'Started regression pipeline for client: {self.ad_client_id}')
         x_train, y_train, x_test, y_test = self.split_for_test()
-        model_for_test = self.build_model(x_train, y_train)
-        self.test_model(model_for_test, x_train, y_train, x_test, y_test)
+        with start_span(op="regression_evaluation", description="Regression evaluation") as span:
+            start_time = time.time()
+            model_for_test = self.build_model(x_train, y_train)
+            span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
+            self.test_model(model_for_test, x_train, y_train, x_test, y_test)
+            span.set_data('ad_client_id', self.ad_client_id)
 
-        generated_model = self.build_model(*self.split_for_train())
-        self.persist_model(generated_model)
-        logger.info('Regression model persisted successfully')
+        with start_span(op="regression_model_building", description="Regression model building") as span:
+            start_time = time.time()
+            generated_model = self.build_model(*self.split_for_train())
+            self.persist_model(generated_model)
+            logger.info('Regression model persisted successfully')
+            span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
+            span.set_data('ad_client_id', self.ad_client_id)
 
         return True
 
