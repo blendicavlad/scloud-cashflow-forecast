@@ -6,6 +6,7 @@ logger = logging.getLogger('modelProducerLog')
 
 LIMIT_RETRIES = 5
 
+
 class DB:
 
     def __init__(self,
@@ -27,7 +28,7 @@ class DB:
     def connected(self) -> bool:
         return self.__connection and self.__connection.closed == 0
 
-    def connect(self, retry_counter = 0):
+    def connect(self, retry_counter=0):
         if not self.__connection:
             try:
                 connection = psycopg2.connect(dbname=self.__database,
@@ -71,4 +72,3 @@ class DB:
     @property
     def schema(self):
         return self.__schema
-

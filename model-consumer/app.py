@@ -17,7 +17,6 @@ sentry_sdk.init(
 app = Flask(__name__, template_folder='templates')
 log.setup_logging()
 logger = logging.getLogger('modelConsumerLog')
-logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 ALLOWED_EXTENSIONS = {'csv'}
 
@@ -38,6 +37,7 @@ def home():
 
 @app.route('/call_service', methods=['POST'])
 def call_service():
+    logger.info(f"service called by ad_client_id: {request.args.get('ad_client_id')}")
     if 'file' not in request.files:
         resp = jsonify({'message': 'No file part in the request'})
         resp.status_code = 400
@@ -57,7 +57,7 @@ def call_service():
             prediction_data = prediction_service.predict(df, request.args.get('ad_client_id'))
         except Exception as e:
             logger.error(e, exc_info=True)
-            resp = jsonify({'message': f'{str(e)}'})
+            resp = jsonify({'message': 'Internal server error'})
             resp.status_code = 500
             return resp
         return prediction_data.to_json(orient='records')

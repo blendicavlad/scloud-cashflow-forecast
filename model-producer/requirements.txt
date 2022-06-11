@@ -6,3 +6,4 @@ scikit-learn~=1.1.1
 matplotlib~=3.5.2
 boto3~=1.13.16
 sentry~=22.5.0
+loggly-python-handler~=1.0.1

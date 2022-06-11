@@ -1,10 +1,18 @@
+import os
+
 from utils import log
 from service import data_cleaning_service
 import logging
+import sentry_sdk
 
 log.setup_logging()
 logger = logging.getLogger('appLog')
-    
+
+sentry_sdk.init(
+    os.environ.get('SENTRY_KEY'),
+    traces_sample_rate=1.0
+)
+
 
 def call_service():
     cleaner_service = data_cleaning_service.DataCleaningService()

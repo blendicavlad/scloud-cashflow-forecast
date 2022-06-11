@@ -6,6 +6,7 @@ logger = logging.getLogger('modelConsumerLog')
 
 LIMIT_RETRIES = 5
 
+
 class DB:
 
     def __init__(self,
@@ -27,7 +28,7 @@ class DB:
     def connected(self) -> bool:
         return self.__connection and self.__connection.closed == 0
 
-    def connect(self, retry_counter = 0):
+    def connect(self, retry_counter=0):
         if not self.__connection:
             try:
                 connection = psycopg2.connect(dbname=self.__database,
@@ -58,6 +59,8 @@ class DB:
     def close(self):
         if self.connected():
             try:
+                if self.__cursor:
+                    self.__cursor.close()
                 self.__connection.close()
             except Exception as e:
                 logger.error('unable to close db connection: ' + str(e))
@@ -71,4 +74,3 @@ class DB:
     @property
     def schema(self):
         return self.__schema
-

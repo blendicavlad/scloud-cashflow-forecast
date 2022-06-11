@@ -7,6 +7,13 @@ formatters:
       %(message)s'
   info:
     format: '%(asctime)s-%(levelname)s-%(name)s::%(module)s|%(lineno)s:: %(message)s'
+  jsonFormat:
+    format: '{ "loggerName": "%(name)s", "asciTime": "%(asctime)s", "fileName": "%(filename)s", "logRecordCreationTime": "%(created)f", "functionName": "%(funcName)s", "levelNo": "%(levelno)s", "lineNo": "%(lineno)d", "time": "%(msecs)d", "levelName": "%(levelname)s", "message": "%(message)s" }'
+
+filters:
+  show_info_only:
+    (): utils.log.InfoFilter
+
 
 handlers:
   debug_console_handler:
@@ -33,12 +40,20 @@ handlers:
     maxBytes: 1048576
     mode: a
 
+  handler_HTTPSHandler:
+    class: loggly.handlers.HTTPSHandler
+    formatter: jsonFormat
+    level: INFO
+    url: ${LOGGLY_URL}
+    filters: [ show_info_only ]
+
+
 root:
   handlers: [debug_console_handler, info_rotating_file_handler, error_file_handler]
   level: NOTSET
 
 loggers:
   modelProducerLog:
-    handlers: [debug_console_handler, info_rotating_file_handler, error_file_handler]
+    handlers: [debug_console_handler, info_rotating_file_handler, error_file_handler, handler_HTTPSHandler]
     level: INFO
     propagate: false

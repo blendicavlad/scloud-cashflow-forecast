@@ -14,6 +14,8 @@ from sentry_sdk import start_span
 import time
 import datetime
 
+from datasource.db_api import DB_Interface
+from datasource.db_props import DATA_CLEANING_SCHEMA
 from . import file_service
 from .ml_pipeline import MLPipeline, PipelineType
 from .classification_pipeline import ClassificationPipeline
@@ -50,18 +52,20 @@ class RegressionPipeline(MLPipeline):
         x_train, y_train, x_test, y_test = self.split_for_test()
         with start_span(op="regression_evaluation", description="Regression evaluation") as span:
             start_time = time.time()
-            model_for_test = self.build_model(x_train, y_train)
+            model_for_test, _ = self.build_model(x_train, y_train)
             span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
-            self.test_model(model_for_test, x_train, y_train, x_test, y_test)
+            test_mse, test_r2 = self.test_model(model_for_test, x_train, y_train, x_test, y_test)
             span.set_data('ad_client_id', self.ad_client_id)
 
         with start_span(op="regression_model_building", description="Regression model building") as span:
             start_time = time.time()
-            generated_model = self.build_model(*self.split_for_train())
+            generated_model, train_r2 = self.build_model(*self.split_for_train())
             self.persist_model(generated_model)
             logger.info('Regression model persisted successfully')
             span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
             span.set_data('ad_client_id', self.ad_client_id)
+
+        self.log_regression_results(test_mse, test_r2, train_r2)
 
         return True
 
@@ -105,8 +109,7 @@ class RegressionPipeline(MLPipeline):
         cv_alpha_test_error = mean_squared_error(y_train,
                                                  y_test_reg)
 
-        logger.info("MSE of test data :" + str(cv_alpha_test_error))
-        logger.info("R^2 of test data: {0}".format(model.score(x_test, y_test)))
+        return cv_alpha_test_error, model.score(x_test, y_test)
 
     def build_model(self, x_train, y_train):
         df = self.__data[self.__cols_reg].reset_index()
@@ -163,11 +166,23 @@ class RegressionPipeline(MLPipeline):
 
         model.fit(x_train, y_train)
 
-        logger.info("R^2 of train data: {0}".format(model.score(x_train, y_train)))
+        r2 = model.score(x_train, y_train)
 
         del df
 
-        return model
+        return model, r2
 
     def persist_model(self, model):
         file_service.persist_model(PipelineType.REGRESSION, model, self.ad_client_id)
+
+    def log_regression_results(self, test_mse, test_r2, train_r2):
+        logger.info("MSE of test data :" + str(test_mse))
+        logger.info("R^2 of test data: {0}".format(test_r2))
+        logger.info("R^2 of train data: {0}".format(train_r2))
+
+        sql = f'insert into {DATA_CLEANING_SCHEMA}.regression_stats (ad_client_id, test_mse, test_r2, train_r2)'\
+              f'values (%s,%s,%s,%s)'
+
+        with DB_Interface() as db_api:
+            db_api.execute_statement(sql, (self.ad_client_id, test_mse, test_r2, train_r2))
+

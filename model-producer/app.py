@@ -5,10 +5,8 @@ from service import pipeline_runner
 from utils import log
 import sentry_sdk
 
-
 log.setup_logging()
 logger = logging.getLogger('modelProducerLog')
-logging.getLogger('boto').setLevel(logging.CRITICAL)
 
 sentry_sdk.init(
     os.environ.get('SENTRY_KEY'),
@@ -18,9 +16,7 @@ sentry_sdk.init(
 
 def call_service():
     logger.info('Service started')
-    logger.info('test')
-    runner = pipeline_runner.PipelineRunner()
-    state_map = runner.run()
+    state_map = pipeline_runner.run()
     ret_map = {}
     for k, v in state_map.items():
         if v is True:

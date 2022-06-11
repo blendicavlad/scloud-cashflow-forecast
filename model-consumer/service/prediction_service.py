@@ -120,15 +120,6 @@ def get_aggregated_data_for_bpartners(c_bpartner_ids: List) -> DataFrame:
     bpartner_ids_str = [str(c_bpartner_id) for c_bpartner_id in c_bpartner_ids]
     bpartner_ids_in_clause = f"({(','.join(bpartner_ids_str))})"
 
-    db = DB(DATA_CLEANING_DATABASE,
-            DATA_CLEANING_USER,
-            DATA_CLEANING_PASSWORD,
-            DATA_CLEANING_HOST,
-            DATA_CLEANING_PORT,
-            DATA_CLEANING_SCHEMA)
-
-    db_api = DB_Interface(db)
-
     sql = \
         f"""
             SELECT DISTINCT ad_org_id,
@@ -167,6 +158,6 @@ def get_aggregated_data_for_bpartners(c_bpartner_ids: List) -> DataFrame:
                     WHERE c_bpartner_id IN {bpartner_ids_in_clause} 
             """
 
-    df = db_api.get_data_to_df(sql=sql)
-    db.close()
+    with DB_Interface() as db_api:
+        df = db_api.get_data_to_df(sql=sql)
     return df

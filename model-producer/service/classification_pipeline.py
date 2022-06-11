@@ -19,6 +19,8 @@ import pandas as pd
 from sklearn.svm import LinearSVC
 from sentry_sdk import start_span
 
+from datasource.db_api import DB_Interface
+from datasource.db_props import DATA_CLEANING_SCHEMA
 from . import file_service
 from .ml_pipeline import MLPipeline, PipelineType
 
@@ -154,11 +156,6 @@ class ClassificationPipeline(MLPipeline):
 
             y_pred = grid.predict(x_test)
 
-            display = RocCurveDisplay.from_estimator(grid.best_estimator_, x_test, y_test)
-            plt = display.figure_
-            file_service.persist_classifier_plot(plot=plt, pipeline_type=PipelineType.CLASSIFICATION,
-                                                 classifier_name=str(type(classifier_params['classifier'][0]).__name__),
-                                                 ad_client_id=self.ad_client_id)
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
 
             model_state = {
@@ -168,6 +165,7 @@ class ClassificationPipeline(MLPipeline):
                 'auc': metrics.roc_auc_score(y_test, y_pred),
                 'precision': metrics.precision_score(y_test, y_pred),
                 'recall': metrics.recall_score(y_test, y_pred),
+                'accuracy': metrics.accuracy_score(y_test, y_pred),
                 'f1': metrics.f1_score(y_test, y_pred),
                 'FP': _confusion_matrix[0, 1],
                 'FN': _confusion_matrix[1, 0],
@@ -178,23 +176,13 @@ class ClassificationPipeline(MLPipeline):
 
             result_list.append(model_state)
             logger.info('Done with {0}'.format(type(classifier_params['classifier'][0]).__name__))
-            logger.info('Grid confusion matrix: ' + str({
-                'FP': _confusion_matrix[0, 1],
-                'FN': _confusion_matrix[1, 0],
-                'TP': _confusion_matrix[1, 1],
-                'TN': _confusion_matrix[0, 0],
-            }))
 
             if current_best_score < grid.best_score_:
                 current_best_score = grid.best_score_
                 current_best_params = classifier_params
 
-        df_result = pd.DataFrame(result_list)
-        df_result = df_result.sort_values(by='best_score', ascending=False)
-
-        model = df_result.sort_values(by='best_score', ascending=False).grid_obj[0].best_estimator_
-
-        logger.info("model score: %.3f" % model.score(x_test, y_test))
+        best_result = pd.DataFrame(result_list).sort_values(by='best_score', ascending=False).iloc[0].to_dict()
+        self.log_model_results(best_result, x_test, y_test)
 
         return current_best_params
 
@@ -222,3 +210,33 @@ class ClassificationPipeline(MLPipeline):
 
     def persist_model(self, model):
         file_service.persist_model(PipelineType.CLASSIFICATION, model, self.ad_client_id)
+
+    def log_model_results(self, result_dict, x_test, y_test):
+
+        model = result_dict['grid_obj'].best_estimator_
+        display = RocCurveDisplay.from_estimator(model, x_test, y_test)
+        score = model.score(x_test, y_test)
+        plt = display.figure_
+        file_service.persist_classifier_plot(plot=plt, pipeline_type=PipelineType.CLASSIFICATION,
+                                             classifier_name=result_dict['classifierName'],
+                                             ad_client_id=self.ad_client_id)
+        result = {
+            'AD_Client_ID': self.ad_client_id,
+            'auc': result_dict['auc'],
+            'precision': result_dict['precision'],
+            'recall': result_dict['recall'],
+            'accuracy': result_dict['accuracy'],
+            'score': score,
+            'FP': result_dict['FP'],
+            'FN': result_dict['FN'],
+            'TP': result_dict['TP'],
+            'TN': result_dict['TN'],
+        }
+
+        logger.info(str(result))
+        logger.info("model score: %.3f" % score)
+        sql = f'insert into {DATA_CLEANING_SCHEMA}.classification_stats (ad_client_id, auc, precision, recall, accuracy, score, fp, fn, tp, tn) ' \
+              'values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)'
+
+        with DB_Interface() as db_api:
+            db_api.execute_statement(sql, tuple(result.values()))

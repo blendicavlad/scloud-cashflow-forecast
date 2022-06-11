@@ -1,8 +1,30 @@
 import logging
 import os
+import re
 
 import yaml
 from logging.config import dictConfig
+
+
+env_var_path_matcher = re.compile(r'.*\${([^}^{]+)}.*')
+
+
+def path_constructor(loader, node):
+    return os.path.expandvars(node.value)
+
+
+class EnvVarLoader(yaml.SafeLoader):
+    pass
+
+
+EnvVarLoader.add_implicit_resolver('!path', env_var_path_matcher, None)
+EnvVarLoader.add_constructor('!path', path_constructor)
+
+
+class InfoFilter(logging.Filter):
+    def filter(self, log_record):
+        return log_record.levelno == logging.INFO
+
 
 def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_key='LOG_CFG'):
     """
@@ -21,7 +43,7 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_k
     if os.path.exists(path):
         with open(path, 'rt') as f:
             try:
-                config = yaml.safe_load(f.read())
+                config = yaml.load(f.read(), Loader=EnvVarLoader)
                 dictConfig(config)
             except Exception as e:
                 print(e)
