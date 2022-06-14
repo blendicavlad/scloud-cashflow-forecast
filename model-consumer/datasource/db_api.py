@@ -2,7 +2,7 @@ from psycopg2.extensions import STATUS_BEGIN
 
 from datasource.db import DB
 import pandas.io.sql as pandas_sql
-from db_props import DATA_CLEANING_USER, DATA_CLEANING_PASSWORD, DATA_CLEANING_DATABASE, DATA_CLEANING_HOST, \
+from .db_props import DATA_CLEANING_USER, DATA_CLEANING_PASSWORD, DATA_CLEANING_DATABASE, DATA_CLEANING_HOST, \
     DATA_CLEANING_PORT, DATA_CLEANING_SCHEMA
 
 

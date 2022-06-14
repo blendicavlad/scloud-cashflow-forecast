@@ -37,7 +37,7 @@ class DB_Interface:
         self._db.connect()
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback):
         if self._db.connection is not None and self._db.connection.status == STATUS_BEGIN:
             if exc_type is None:
                 self._db.connection.commit()
