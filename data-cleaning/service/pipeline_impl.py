@@ -210,7 +210,10 @@ class PaymentTermCleaningPipeline(AbstractPipeline):
         return df
 
 
-# Proceseaza data_frame-ul in chunk uri
+class DataCleaningException(Exception):
+    pass
+
+
 class AggregationPipeline(AbstractPipeline):
     dest_table_name = 'cleaned_aggregated_data'
 
@@ -291,7 +294,7 @@ class AggregationPipeline(AbstractPipeline):
         if not empty_dataframes:
             return self.generate_aggregated_cleaned_df(allocations_df, invoice_df, payments_df, terms_df)
         else:
-            logger.info('Empty cleaned dataframes: ' + ','.join(empty_dataframes) + ' for client: ' + self.ad_client_id)
+            logger.info('Empty cleaned dataframes: ' + ','.join(empty_dataframes) + ' for client: ' + str(self.ad_client_id))
             return pd.DataFrame()
 
     def generate_aggregated_cleaned_df(self, allocations_df, invoice_df, payments_df, terms_df):
@@ -530,6 +533,8 @@ class AggregationPipeline(AbstractPipeline):
             del fully_paid, partially_paid, unpaid_balance, partially_paid_2, cash_paid, p1, unpaid_invoices, cash_paid4, fp2, unpaid_balance2, p2, cash_paid2, cash_paid3, p3, p4
         logger.info(f'Merge phase finished in {str(datetime.timedelta(seconds=(time.time() - start_time)))} seconds')
         df['c_allocationline_id'] = df['c_allocationline_id'].astype('Int64')
+        if df.empty:
+            raise DataCleaningException('Not enough data for client: ' + str(self.ad_client_id))
         df = self.__build_training_data(df)
         return df
 

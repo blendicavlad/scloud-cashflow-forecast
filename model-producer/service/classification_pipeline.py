@@ -18,6 +18,7 @@ from sklearn import metrics
 import pandas as pd
 from sklearn.svm import LinearSVC
 from sentry_sdk import start_span
+import math
 
 from datasource.db_api import DB_Interface
 from datasource.db_props import DATA_CLEANING_SCHEMA
@@ -31,6 +32,24 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 logger = logging.getLogger('modelProducerLog')
 
 logging.getLogger('matplotlib.font_manager').disabled = True
+
+
+class ClassificationException(Exception):
+    def __init__(self, message):
+        super().__init__('Classification Exception: ' + message)
+    pass
+
+
+class OnlyOneClassException(ClassificationException):
+    def __init__(self, message='Only one class found in data'):
+        super().__init__(message)
+    pass
+
+
+class NotEnoughDataException(ClassificationException):
+    def __init__(self, message='Not enough training data'):
+        super().__init__(message)
+    pass
 
 
 class ClassificationPipeline(MLPipeline):
@@ -54,13 +73,15 @@ class ClassificationPipeline(MLPipeline):
     def distribute_data(df):
         df1 = df[df.paid == 1]
         df2 = df[df.paid == 0]
+        if len(df1) == 0 or len(df2) == 0:
+            raise OnlyOneClassException()
         if len(df2) > len(df1):
             bigger_len = len(df2)
             lesser_len = len(df1)
         else:
             bigger_len = len(df1)
             lesser_len = len(df2)
-        step = round(bigger_len / (lesser_len - 1))
+        step = math.ceil(bigger_len / (lesser_len - 1))
         if step == 1:  # if step is 1 then the data is already evenly distributed
             ret = df
         else:
@@ -69,8 +90,12 @@ class ClassificationPipeline(MLPipeline):
             df1_idx = [range(i + 1, i + 1 + step) for i in df2_idx]
             df1_idx = [i for idx_range in df1_idx for i in idx_range][:bigger_len]
 
-            df1.index = df1_idx
-            df2.index = df2_idx
+            if len(df2) > len(df1):
+                df1.index = df2_idx
+                df2.index = df1_idx
+            else:
+                df1.index = df1_idx
+                df2.index = df2_idx
             ret = pandas.concat([df1, df2]).sort_index()
         del df1
         del df2
@@ -95,27 +120,29 @@ class ClassificationPipeline(MLPipeline):
 
         return True
 
-    def split_for_test(self, n_years=1):
+    def split_for_test(self, n_days=365):
         features = self.__numeric_features + self.__categorical_features
         x_train = \
             self.__data[
-                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-n_days)][
                 features]
         y_train = \
             self.__data[
-                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)][
+                self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-n_days)][
                 self.target]
 
         x_test = \
             self.__data[
-                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
-                    days=-365 * (n_years - 1)))][features]
+                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-n_days))][features]
         y_test = \
             self.__data[
-                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-                (self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(
-                    days=-365 * (n_years - 1)))][self.target]
+                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-n_days))][
+                self.target]
+
+        if len(x_test) == 0 or len(y_test) == 0:
+            if n_days == 0:
+                raise NotEnoughDataException()
+            return self.split_for_test(n_days=int(n_days / 2))
         return x_train, y_train, x_test, y_test
 
     def split_for_train(self):
@@ -158,11 +185,17 @@ class ClassificationPipeline(MLPipeline):
 
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
 
+            try:
+                aoc_curve = metrics.roc_auc_score(y_test, y_pred)
+            except Exception as e:
+                logger.error('Unable to generate ROC curve: ' + str(e))
+                aoc_curve = None
+
             model_state = {
                 'classifierName': type(classifier_params['classifier'][0]).__name__,
                 'best_score': grid.best_score_,
                 'best_params': grid.best_params_,
-                'auc': metrics.roc_auc_score(y_test, y_pred),
+                'auc': aoc_curve,
                 'precision': metrics.precision_score(y_test, y_pred),
                 'recall': metrics.recall_score(y_test, y_pred),
                 'accuracy': metrics.accuracy_score(y_test, y_pred),
@@ -192,6 +225,12 @@ class ClassificationPipeline(MLPipeline):
         return model
 
     def train_model_grid(self, classifier_params, x_train, y_train):
+        cv = 5
+        if cv >= len(x_train):
+            cv = int(len(x_train) / 2)
+        if cv < 2:
+            raise NotEnoughDataException()
+
         model = Pipeline(steps=[
             ('column_transformer', ColumnTransformer(
                 transformers=[
@@ -214,12 +253,15 @@ class ClassificationPipeline(MLPipeline):
     def log_model_results(self, result_dict, x_test, y_test):
 
         model = result_dict['grid_obj'].best_estimator_
-        display = RocCurveDisplay.from_estimator(model, x_test, y_test)
         score = model.score(x_test, y_test)
-        plt = display.figure_
-        file_service.persist_classifier_plot(plot=plt, pipeline_type=PipelineType.CLASSIFICATION,
-                                             classifier_name=result_dict['classifierName'],
-                                             ad_client_id=self.ad_client_id)
+        try:
+            display = RocCurveDisplay.from_estimator(model, x_test, y_test)
+            plt = display.figure_
+            file_service.persist_classifier_plot(plot=plt, pipeline_type=PipelineType.CLASSIFICATION,
+                                                 classifier_name=result_dict['classifierName'],
+                                                 ad_client_id=self.ad_client_id)
+        except Exception as e:
+            logger.error("Could not generate classifier plot: " + str(e))
         result = {
             'AD_Client_ID': self.ad_client_id,
             'auc': result_dict['auc'],

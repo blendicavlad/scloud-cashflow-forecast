@@ -42,7 +42,7 @@ def run():
             logger.error(f'Unable to run pipelines executor, err: {str(e)}')
             logger.error(traceback.format_exc())
             state_map[ad_client_id] = False
-        wait(futures, timeout=86400, return_when=ALL_COMPLETED)
+        wait(futures, timeout=8640, return_when=ALL_COMPLETED)
         for f in futures:
             ad_client_id, result = f.result()
             state_map[ad_client_id] = result
@@ -70,7 +70,7 @@ def run_pipelines(data: DataFrame, ad_client_id: int):
 
     del data
 
-    return {
+    return ad_client_id, {
         "classification": classification_result,
         'regression': regression_result
     }

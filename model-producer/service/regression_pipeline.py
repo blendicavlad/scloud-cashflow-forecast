@@ -27,6 +27,19 @@ warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
 logger = logging.getLogger('modelProducerLog')
 
 
+class RegressionException(Exception):
+    def __init__(self, message):
+        super().__init__('Regression Exception: ' + message)
+
+    pass
+
+
+class NotEnoughDataException(RegressionException):
+    def __init__(self, message='Not enough training data'):
+        super().__init__(message)
+    pass
+
+
 class RegressionPipeline(MLPipeline):
     target = 'daystosettle'
 
@@ -49,13 +62,18 @@ class RegressionPipeline(MLPipeline):
 
     def run(self) -> bool:
         logger.info(f'Started regression pipeline for client: {self.ad_client_id}')
-        x_train, y_train, x_test, y_test = self.split_for_test()
-        with start_span(op="regression_evaluation", description="Regression evaluation") as span:
-            start_time = time.time()
-            model_for_test, _ = self.build_model(x_train, y_train)
-            span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
-            test_mse, test_r2 = self.test_model(model_for_test, x_train, y_train, x_test, y_test)
-            span.set_data('ad_client_id', self.ad_client_id)
+        try:
+            x_train, y_train, x_test, y_test = self.split_for_test()
+            with start_span(op="regression_evaluation", description="Regression evaluation") as span:
+                start_time = time.time()
+                model_for_test, _ = self.build_model(x_train, y_train)
+                span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
+                test_mse, test_r2 = self.test_model(model_for_test, x_train, y_train, x_test, y_test)
+                span.set_data('ad_client_id', self.ad_client_id)
+        except Exception as e:
+            logger.error('Unable to test model: ' + str(e))
+            test_mse = None
+            test_r2 = None
 
         with start_span(op="regression_model_building", description="Regression model building") as span:
             start_time = time.time()
@@ -69,27 +87,29 @@ class RegressionPipeline(MLPipeline):
 
         return True
 
-    def split_for_test(self, n_years=1):
+    def split_for_test(self, n_days=365):
         df = self.__data
         features = self.__numeric_features + self.__categorical_features
         x_train = df[(df.paid == 1) &
-                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][
+                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-n_days))][
             features]
         y_train = df[(df.paid == 1) &
-                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * n_years))][self.target]
+                     (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-n_days))][self.target]
 
         x_test = \
-            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-               (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][features]
+            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-n_days))][features]
 
         y_test = \
-            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-365 * n_years)) &
-               (df['dateinvoiced'] <= df['dateinvoiced'].max() + timedelta(days=-365 * (n_years - 1)))][self.target]
+            df[(df.paid == 1) & (df['dateinvoiced'] > df['dateinvoiced'].max() + timedelta(days=-n_days))][self.target]
 
         x_train.fillna(value=x_train.mean(), inplace=True)
         y_train.fillna(value=y_train.mean(), inplace=True)
         x_test.fillna(value=x_test.mean(), inplace=True)
         y_test.fillna(value=y_test.mean(), inplace=True)
+        if len(x_test) == 0 or len(y_test) == 0:
+            if n_days == 0:
+                raise NotEnoughDataException()
+            return self.split_for_test(n_days=int(n_days / 2))
         return x_train, y_train, x_test, y_test
 
     def split_for_train(self):
@@ -112,6 +132,12 @@ class RegressionPipeline(MLPipeline):
         return cv_alpha_test_error, model.score(x_test, y_test)
 
     def build_model(self, x_train, y_train):
+        cv = 10
+        if cv >= len(x_train):
+            cv = int(len(x_train) / 2)
+        if cv < 2:
+            raise NotEnoughDataException()
+
         df = self.__data[self.__cols_reg].reset_index()
         cols = [c for c in df if
                 c in self.__numeric_features + self.__categorical_features + [RegressionPipeline.target]]
@@ -138,7 +164,7 @@ class RegressionPipeline(MLPipeline):
         lambda_values = 10 ** np.linspace(10, -3, 100) * 0.5
         x_train_transform = data_transformer.fit_transform(x_train)
 
-        lassocv = LassoCV(alphas=lambda_values, cv=10, max_iter=100000, normalize=True)
+        lassocv = LassoCV(alphas=lambda_values, cv=cv, max_iter=100000, normalize=True)
 
         # antrenare si fit
         lassocv.fit(x_train_transform, y_train)

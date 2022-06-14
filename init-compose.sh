@@ -1,7 +1,6 @@
 #!/bin/bash
 container_name=scloud-cashflow-forecast
 dev_container_name=scloud-cashflow-forecast-dev
-
 # shellcheck disable=SC2162
 read -p "Build dev container (y/n)? " answer
 case ${answer:0:1} in
