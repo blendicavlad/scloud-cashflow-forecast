@@ -150,7 +150,7 @@ class DataCleaningService:
         where_clause = pipeline_obj.filters
         table_predicate = None
 
-        if pipeline == Pipeline.AGGREGATION:
+        if pipeline == Pipeline.ALLOCATION:
             table_predicate = 'no_clean_entries_alloc'
         elif pipeline == Pipeline.PAYMENT:
             table_predicate = 'no_clean_entries_payments'
