@@ -33,7 +33,7 @@ class DataCleaningService:
         ad_client_ids = []
         with DB_Interface(DBType.SOURCE) as db_api:
             rows = db_api.fetch_many(
-                f'SELECT ad_client_id from {SOURCE_SCHEMA}.ad_client WHERE ad_client_id >= 1006463 order by ad_client_id')
+                f'SELECT ad_client_id from {SOURCE_SCHEMA}.ad_client order by ad_client_id')
         for row in rows:
             ad_client_ids.append(row[0])
         state_map = {}
