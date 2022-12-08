@@ -20,7 +20,7 @@ _ml_models_bucket_key = 'client_models'
 def retrieve_model(ad_client_id, model_type: ModelType):
     s3_model_path = get_most_recent_model_for_client(ad_client_id, model_type)
     if s3_model_path is None:
-        raise Exception(f"No {ModelType.REGRESSION.value[0]} model for client: {ad_client_id}")
+        raise Exception(f"No {model_type.value[0]} model for client: {ad_client_id}")
 
     local_file_path = _local_models_directory + '/' + s3_model_path['Key'][s3_model_path['Key'].rfind('/') + 1:]
     os.chdir(os.path.abspath(os.sep))

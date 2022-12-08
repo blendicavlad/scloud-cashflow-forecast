@@ -14,6 +14,8 @@ run ` docker-compose -f docker-compose.dev.yml up ` to update and run the dev co
 
 run ` docker-compose up ` to update and run the prod container
 
+run ` docker-compose -f docker-compose.dev.yml up -d --no-deps --build $service_name` to rebuild a specific container
+
 to download the test data, you must set aws creds env variables
 
 the prod app is made of 4 docker services:

@@ -13,6 +13,9 @@ from sentry_sdk import start_transaction, start_span
 
 from pandas import DataFrame
 
+class ClientException(Exception):
+    pass
+
 features = ['closed_late_invoices_no',
             'paid_late_percent',
             'paid_late_total',
@@ -44,8 +47,12 @@ def predict(df: DataFrame, ad_client_id):
 
     with start_transaction(op="task", name="prediction_task"):
         if agg_data.empty:
-            raise Exception('No model generated for the provided BPartners')
+            raise ClientException('No model generated for the provided BPartners')
         joined_data = join_data(df, agg_data, ad_client_id)
+        if joined_data.__len__() != df.__len__():
+            raise ClientException('Unable to join the provided dataframe with the data-lake,'
+                            ' most likely you provided records with an Org, Business Partner or Business Partner Location'
+                            ' that currently does not exist in the data-lake used for modelling, try again later')
         build_derived_features(joined_data, ad_client_id)
 
         classification_result = get_classification_result(joined_data, ad_client_id)

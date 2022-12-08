@@ -15,13 +15,13 @@ logger = logging.getLogger('modelProducerLog')
 
 
 def run():
-    ad_client_ids = []
+    ad_client_ids = [1000298]
     with DB_Interface() as db_api:
-        rows = db_api.fetch_many(f'SELECT DISTINCT ad_client_id '
-                        f'FROM {DATA_CLEANING_SCHEMA}.cleaned_aggregated_data '
-                        f'ORDER BY ad_client_id')
-        for row in rows:
-            ad_client_ids.append(row[0])
+        # rows = db_api.fetch_many(f'SELECT DISTINCT ad_client_id '
+        #                 f'FROM {DATA_CLEANING_SCHEMA}.cleaned_aggregated_data '
+        #                 f'ORDER BY ad_client_id')
+        # for row in rows:
+        #     ad_client_ids.append(row[0])
 
         state_map = {}
         futures = []
@@ -58,14 +58,14 @@ def run_pipelines(data: DataFrame, ad_client_id: int):
         with start_transaction(op="classification_pipeline", name="classification_pipeline"):
             classification_result = ClassificationPipeline(data, ad_client_id).run()
     except Exception as e:
-        logger.error(f'Error in classification pipeline for client: {ad_client_id} , err: {str(e)}')
+        logger.error(f'Unable to generate classification model for the client: {ad_client_id} , err: {str(e)}')
         logger.error(traceback.format_exc())
 
     try:
         with start_transaction(op="regression_pipeline", name="regression_pipeline"):
             regression_result = RegressionPipeline(data, ad_client_id).run()
     except Exception as e:
-        logger.error(f'Error in regression pipeline for client: {ad_client_id} , err: {str(e)}')
+        logger.error(f'Unable to generate a regression model for the client: {ad_client_id} , err: {str(e)}')
         logger.error(traceback.format_exc())
 
     del data

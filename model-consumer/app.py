@@ -55,6 +55,11 @@ def call_service():
         df = pd.read_csv(file.stream)
         try:
             prediction_data = prediction_service.predict(df, request.args.get('ad_client_id'))
+        except prediction_service.ClientException as e:
+            logger.error(e, exc_info=True)
+            resp = jsonify({'message': str(e)})
+            resp.status_code = 500
+            return resp
         except Exception as e:
             logger.error(e, exc_info=True)
             resp = jsonify({'message': 'Internal server error'})

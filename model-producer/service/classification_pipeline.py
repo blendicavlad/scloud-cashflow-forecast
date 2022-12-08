@@ -111,7 +111,8 @@ class ClassificationPipeline(MLPipeline):
 
         with start_span(op="classifier_model_building", description="Classification model building") as span:
             start_time = time.time()
-            model = self.build_model(best_params, *self.split_for_train())
+            x_train, y_train, _, _ = self.split_for_test()
+            model = self.build_model(best_params, x_train, y_train)
             span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
 
         self.persist_model(model)
@@ -121,11 +122,10 @@ class ClassificationPipeline(MLPipeline):
         return True
 
     def split_for_test(self, n_days=365):
-        features = self.__numeric_features + self.__categorical_features
         x_train = \
             self.__data[
                 self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-n_days)][
-                features]
+                self.__features]
         y_train = \
             self.__data[
                 self.__data['dateinvoiced'] <= self.__data['dateinvoiced'].max() + timedelta(days=-n_days)][
@@ -133,7 +133,7 @@ class ClassificationPipeline(MLPipeline):
 
         x_test = \
             self.__data[
-                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-n_days))][features]
+                (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-n_days))][self.__features]
         y_test = \
             self.__data[
                 (self.__data['dateinvoiced'] > self.__data['dateinvoiced'].max() + timedelta(days=-n_days))][
@@ -147,8 +147,7 @@ class ClassificationPipeline(MLPipeline):
 
     def split_for_train(self):
         df = self.__data
-        features = self.__numeric_features + self.__categorical_features
-        x_train = df[features]
+        x_train = df[self.__features]
         y_train = df[self.target]
 
         x_train.fillna(value=x_train.mean(), inplace=True)
@@ -161,16 +160,15 @@ class ClassificationPipeline(MLPipeline):
             {'classifier': [RandomForestClassifier()],
              'classifier__n_estimators': [10, 100, 500],
              'classifier__max_samples': [0.1, 0.2, 0.3],
-             'classifier__class_weight': ['balanced']
              },
-            {
-                'classifier': [LinearSVC()],
-                'classifier__penalty': ['l2'],
-                'classifier__random_state': [0],
-                'classifier__dual': [False],
-                'classifier__class_weight': ['balanced'],
-                'classifier__max_iter': [10000]
-            }
+            # {
+            #     'classifier': [LinearSVC()],
+            #     'classifier__penalty': ['l2'],
+            #     'classifier__random_state': [0],
+            #     'classifier__dual': [False],
+            #     'classifier__class_weight': ['balanced'],
+            #     'classifier__max_iter': [10000]
+            # }
         ]
 
         result_list = []
