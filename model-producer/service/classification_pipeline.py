@@ -16,8 +16,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import metrics
 import pandas as pd
+import numpy as np
 from sklearn.svm import LinearSVC
-from sentry_sdk import start_span
 import math
 
 from datasource.db_api import DB_Interface
@@ -30,8 +30,6 @@ warnings.simplefilter(action='ignore', category=SettingWithCopyWarning)
 warnings.simplefilter(action='ignore', category=UserWarning)
 
 logger = logging.getLogger('modelProducerLog')
-
-logging.getLogger('matplotlib.font_manager').disabled = True
 
 
 class ClassificationException(Exception):
@@ -104,16 +102,9 @@ class ClassificationPipeline(MLPipeline):
     def run(self) -> bool:
         logger.info(f'Started classification pipeline for client: {self.ad_client_id}')
 
-        with start_span(op="classifier_evaluation", description="Classifier evaluation") as span:
-            start_time = time.time()
-            best_params = self.evaluate_classifiers(*self.split_for_test())
-            span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
-
-        with start_span(op="classifier_model_building", description="Classification model building") as span:
-            start_time = time.time()
-            x_train, y_train, _, _ = self.split_for_test()
-            model = self.build_model(best_params, x_train, y_train)
-            span.set_data('seconds_run', datetime.timedelta(seconds=(time.time() - start_time)))
+        best_params = self.evaluate_classifiers(*self.split_for_test())
+        x_train, y_train, _, _ = self.split_for_test()
+        model = self.build_model(best_params, x_train, y_train)
 
         self.persist_model(model)
 
@@ -182,13 +173,15 @@ class ClassificationPipeline(MLPipeline):
             y_pred = grid.predict(x_test)
 
             _confusion_matrix = metrics.confusion_matrix(y_test, y_pred)
+            if _confusion_matrix.shape < (2,2):
+                raise NotEnoughDataException('Could not infer confusion matrix')
 
             try:
                 aoc_curve = metrics.roc_auc_score(y_test, y_pred)
             except Exception as e:
                 logger.error('Unable to generate ROC curve: ' + str(e))
                 aoc_curve = None
-
+            #1000017
             model_state = {
                 'classifierName': type(classifier_params['classifier'][0]).__name__,
                 'best_score': grid.best_score_,

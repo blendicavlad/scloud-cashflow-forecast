@@ -1,4 +1,4 @@
-create table machine_learning.c_invoice
+create table cashflow_forecast.c_invoice
 (
     c_invoice_id               bigint                                  not null
         constraint pk318

@@ -1,4 +1,4 @@
-create table machine_learning.data_cleaning_client_stats (
+create table cashflow_forecast.data_cleaning_client_stats (
     ml_client_stats_id SERIAL PRIMARY KEY,
     ad_client_id bigint,
     date_run timestamp(0) default current_timestamp::timestamp,

@@ -1,3 +1,3 @@
-create table machine_learning.ad_client(
+create table cashflow_forecast.ad_client(
     ad_client_id bigint primary key
 );

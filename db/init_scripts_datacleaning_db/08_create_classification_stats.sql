@@ -1,4 +1,4 @@
-create table machine_learning.classification_stats (
+create table cashflow_forecast.classification_stats (
     classification_stats_id SERIAL PRIMARY KEY,
     ad_client_id bigint,
     date_run timestamp(0) default current_timestamp::timestamp,

@@ -1,4 +1,4 @@
-create table machine_learning.regression_stats(
+create table cashflow_forecast.regression_stats(
     regression_stats_id SERIAL PRIMARY KEY ,
     ad_client_id bigint,
     date_run timestamp(0) default current_timestamp::timestamp,

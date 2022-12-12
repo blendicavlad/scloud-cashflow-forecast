@@ -1,14 +1,14 @@
 version: '3'
 
 services:
-  data-cleaning:
+  data-cleaning-dev:
     container_name: data-cleaning
     build:
       context: ./data-cleaning
       dockerfile: Dockerfile
     depends_on:
       - dev_db
-      - data_cleaning_db
+      - data_cleaning_db-dev
     volumes:
       - ./data-cleaning:/app
     env_file:
@@ -16,13 +16,13 @@ services:
     networks:
       - app-network
 
-  model-consumer:
+  model-consumer-dev:
     container_name: model-consumer
     build:
       context: ./model-consumer
       dockerfile: Dockerfile
     depends_on:
-      - data_cleaning_db
+      - data_cleaning_db-dev
     ports:
       - "5000:5000"
     env_file:
@@ -34,7 +34,7 @@ services:
     networks:
       - app-network
 
-  model-producer:
+  model-producer-dev:
     container_name: model-producer
     build:
       context: ./model-producer
@@ -63,7 +63,7 @@ services:
       - ./dev-db-data:/var/lib/postgresql/data
       - ./db/init_scripts_dev_db/:/docker-entrypoint-initdb.d/
 
-  data_cleaning_db:
+  data_cleaning_db-dev:
     container_name: data_cleaning_db
     image: postgres:13.5-alpine
     ports:
@@ -80,7 +80,7 @@ services:
     container_name: jupyter
     image: jupyter/datascience-notebook
     depends_on:
-      - data_cleaning_db
+      - data_cleaning_db-dev
     volumes:
       - ./playground:/home/jovyan/work
     ports:

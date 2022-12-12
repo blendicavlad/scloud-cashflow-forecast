@@ -1,4 +1,4 @@
-CREATE TABLE machine_learning.c_payment_cleaned(
+CREATE TABLE cashflow_forecast.c_payment_cleaned(
     c_payment_id                   bigint                                       not null
             primary key,
     ad_client_id                   bigint                                       not null,

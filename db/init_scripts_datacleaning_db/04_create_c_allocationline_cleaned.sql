@@ -1,4 +1,4 @@
-CREATE TABLE machine_learning.c_allocationline_cleaned
+CREATE TABLE cashflow_forecast.c_allocationline_cleaned
 (
     c_allocationline_id      bigint                                 not null
             primary key,

@@ -3,15 +3,9 @@ import os
 
 from service import pipeline_runner
 from utils import log
-import sentry_sdk
 
 log.setup_logging()
 logger = logging.getLogger('modelProducerLog')
-
-sentry_sdk.init(
-    os.environ.get('SENTRY_KEY'),
-    traces_sample_rate=1.0
-)
 
 
 def call_service():

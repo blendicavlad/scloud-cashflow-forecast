@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import watchtower
 
 import yaml
 from logging.config import dictConfig
@@ -44,7 +45,6 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_k
             try:
                 config = yaml.load(f.read(), Loader=EnvVarLoader)
                 dictConfig(config)
-                disable_boto3_logging()
             except Exception as e:
                 print(e)
                 print('Error in Logging Configuration. Using default configs')
@@ -52,11 +52,18 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_k
     else:
         logging.basicConfig(level=default_level)
         print('Failed to load configuration file. Using default configs')
+    logger = logging.getLogger('modelProducerLog')
+    logger.addHandler(
+        watchtower.CloudWatchLogHandler(log_group_name=os.environ.get('LOG_GROUP'),
+                                        log_stream_name=os.environ.get('LOG_STREAM')))
+    set_boto3_logging()
+    logging.getLogger('matplotlib').setLevel(logging.INFO)
+    logging.getLogger('matplotlib.font_manager').disabled = True
+    logging.getLogger('matplotlib').disabled = True
 
-
-def disable_boto3_logging():
-    logging.getLogger('boto').setLevel(logging.CRITICAL)
-    logging.getLogger('boto3').setLevel(logging.CRITICAL)
-    logging.getLogger('botocore').setLevel(logging.CRITICAL)
-    logging.getLogger('s3transfer').setLevel(logging.CRITICAL)
-    logging.getLogger('urllib3').setLevel(logging.CRITICAL)
+def set_boto3_logging():
+    logging.getLogger('boto').setLevel(logging.INFO)
+    logging.getLogger('boto3').setLevel(logging.INFO)
+    logging.getLogger('botocore').setLevel(logging.INFO)
+    logging.getLogger('s3transfer').setLevel(logging.INFO)
+    logging.getLogger('urllib3').setLevel(logging.INFO)

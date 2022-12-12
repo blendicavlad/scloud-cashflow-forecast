@@ -1,4 +1,4 @@
-create table machine_learning.c_allocationline
+create table cashflow_forecast.c_allocationline
 (
     c_allocationline_id      bigint                                 not null
         constraint pk390

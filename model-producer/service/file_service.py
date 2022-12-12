@@ -97,12 +97,7 @@ def upload_file(file_name, key=None, bucket=_bucket, object_name=None):
     if object_name is None:
         object_name = os.path.basename(file_name)
 
-    session = boto3.Session(
-        aws_access_key_id=os.environ.get('aws_access_key_id'),
-        aws_secret_access_key=os.environ.get('aws_secret_access_key'),
-        aws_session_token=os.environ.get('aws_session_token')
-    )
-    s3_client = session.client('s3')
+    s3_client = boto3.client('s3')
     # Upload the file
     try:
         if key is not None:

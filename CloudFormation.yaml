@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS Batch ML environment
+
+Resources:
+  # EC2 Compute Environment
+  BatchMLEnvironment:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ComputeEnvironmentName: scloud-ml-compute-env
+      ComputeResources:
+        Type: EC2
+        InstanceTypes: [m5a.large]
+        MinvCpus: 0
+        DesiredvCpus: 0
+        InstanceRole: createNewRole
+        ServiceRole: AWSServiceRoleForBatch
+        allocationStrategy: BEST_FIT_PROGRESSIVE
+        subnets: [subnet-03f91a1751e637d2d]
+        securityGroupIds: [sg-024b68245c1db0324]
+
+  # Job Queue
+  BatchMLQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref BatchMLEnvironment
+      Priority: 1
+
+  # Batch Job Definitions
+  DataCleaningJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: data-cleaning-job
+      Type: container
+      ContainerProperties:
+        Image:
+        Vcpus: 1
+        Memory: 8000
+        Timeout: 3600
+      RetryStrategy:
+        Attempts: 1
+
+  ModelProducerJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      JobDefinitionName: model-producer-job
+      Type: container
+      ContainerProperties:
+        Image:
+        Vcpus: 4
+        Memory: 8000
+        Timeout: 3600
+      RetryStrategy:
+        Attempts: 1

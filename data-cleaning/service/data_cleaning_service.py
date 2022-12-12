@@ -12,7 +12,6 @@ from concurrent.futures import ProcessPoolExecutor, wait, ALL_COMPLETED
 import logging
 from service.pipeline import Pipeline
 from datasource.db_props import SOURCE_SCHEMA, DATA_CLEANING_SCHEMA
-from sentry_sdk import start_transaction, start_span
 
 logger = logging.getLogger('appLog')
 
@@ -80,29 +79,28 @@ class DataCleaningService:
                         sql=f'SELECT * FROM {DATA_CLEANING_SCHEMA}.c_paymentterm_cleaned'
                             f' WHERE ad_client_id = ' + str(ad_client_id))
 
-                    with start_transaction(op="aggregate_data", name="aggregate_data"):
-                        aggregated_df = AggregationPipeline(ad_client_id) \
-                            .run(cleaned_invoices_df, cleaned_allocations_df, cleaned_payments_df, cleaned_terms_df)
-                        if aggregated_df is not None and not aggregated_df.empty:
-                            self.clear_aggregated_data(db_api, ad_client_id)
-                            if not db_api.copy_from_df(aggregated_df, AggregationPipeline.dest_table_name):
-                                raise Exception(f'Could not persist data into {AggregationPipeline.dest_table_name}')
-                            time_run = datetime.timedelta(seconds=(time.time() - start_time))
-                            logger.info(f' finished aggregation pipeline for ad_client_id {ad_client_id} in'
-                                        f' {str(time_run)} seconds')
-                            pipeline_state = PipelineState(
-                                time_run=time_run,
-                                total_rows=len(cleaned_invoices_df) + len(cleaned_allocations_df) + len(
-                                    cleaned_payments_df) + len(cleaned_terms_df),
-                                result_rows=len(aggregated_df),
-                                ad_client_id=ad_client_id,
-                                pipeline=Pipeline.AGGREGATION
-                            )
-                            pipeline_state_list.append(pipeline_state)
-                        else:
-                            logger.error(
-                                'Could not construct aggregated data, most likely not enough data in the cleaned tables')
-                            return False
+                    aggregated_df = AggregationPipeline(ad_client_id) \
+                        .run(cleaned_invoices_df, cleaned_allocations_df, cleaned_payments_df, cleaned_terms_df)
+                    if aggregated_df is not None and not aggregated_df.empty:
+                        self.clear_aggregated_data(db_api, ad_client_id)
+                        if not db_api.copy_from_df(aggregated_df, AggregationPipeline.dest_table_name):
+                            raise Exception(f'Could not persist data into {AggregationPipeline.dest_table_name}')
+                        time_run = datetime.timedelta(seconds=(time.time() - start_time))
+                        logger.info(f' finished aggregation pipeline for ad_client_id {ad_client_id} in'
+                                    f' {str(time_run)} seconds')
+                        pipeline_state = PipelineState(
+                            time_run=time_run,
+                            total_rows=len(cleaned_invoices_df) + len(cleaned_allocations_df) + len(
+                                cleaned_payments_df) + len(cleaned_terms_df),
+                            result_rows=len(aggregated_df),
+                            ad_client_id=ad_client_id,
+                            pipeline=Pipeline.AGGREGATION
+                        )
+                        pipeline_state_list.append(pipeline_state)
+                    else:
+                        logger.error(
+                            'Could not construct aggregated data, most likely not enough data in the cleaned tables')
+                        return False
                 except DataCleaningException as e:
                     logger.error(f'Could not run data pipeline for client_id: {ad_client_id} \n {str(e)}')
                     return False
@@ -110,28 +108,27 @@ class DataCleaningService:
                     logger.error(f'Error in aggregation pipeline for client_id: {ad_client_id} \n {str(e)}')
                     logger.error(traceback.format_exc())
                     return False
-
-                while not queue.empty():
-                    pipeline_state_list.append(queue.get())
-                PipelineState.persist_pipeline_state_list(db_api, pipeline_state_list)
+                finally:
+                    while not queue.empty():
+                        pipeline_state_list.append(queue.get())
+                    PipelineState.persist_pipeline_state_list(db_api, pipeline_state_list)
         return True
 
     def clean_data(self,
                    pipeline: Pipeline,
                    queue: Queue,
                    ad_client_id: int) -> bool:
-        with start_transaction(op="clean_data", name="clean_data"):
-            logger.info(f'Started subprocess with ID:{os.getpid()}'
-                        f' for: client: {ad_client_id}'
-                        f' ,pipeline: {pipeline.name}')
-            try:
-                self.process_chunks(pipeline, queue, ad_client_id)
-            except Exception as e:
-                logger.exception(f'Error in pid: {os.getpid()} '
-                                 f'for data entity: {pipeline.name} '
-                                 f'- ERR: {str(e)}')
-                logger.error(str(e))
-                return False
+        logger.info(f'Started subprocess with ID:{os.getpid()}'
+                    f' for: client: {ad_client_id}'
+                    f' ,pipeline: {pipeline.name}')
+        try:
+            self.process_chunks(pipeline, queue, ad_client_id)
+        except Exception as e:
+            logger.exception(f'Error in pid: {os.getpid()} '
+                             f'for data entity: {pipeline.name} '
+                             f'- ERR: {str(e)}')
+            logger.error(str(e))
+            return False
         return True
 
     @staticmethod
@@ -173,7 +170,7 @@ class DataCleaningService:
             if date_last_run is not None:
                 if where_clause is not None:
                     where_clause += " AND "
-                where_clause += "created >= to_timestamp('" + str(
+                where_clause += "created > to_timestamp('" + str(
                     date_last_run[0]) + "', 'YYYY-MM-DD HH24:MI:SS')::timestamp"
 
             df_iter = source_db_api.get_data_for_pipeline(pipeline=pipeline_obj, where_clause=where_clause,
@@ -181,31 +178,29 @@ class DataCleaningService:
             total_chunks, total_rows, result_rows = 0, 0, 0
             dest_table = pipeline.value.dest_table_name
 
-            with start_span(op="clean_chunks", description="clean_chunks") as span:
-                span.set_data('ad_client_id', ad_client_id)
-                for chunk in df_iter:
-                    cleaned_chunk = pipeline_obj.clean_df(chunk)
-                    result_rows += len(cleaned_chunk)
-                    total_chunks = total_chunks + 1
-                    total_rows += len(chunk.index)
-                    if not db_api.copy_from_df(df=cleaned_chunk, table=dest_table):
-                        raise Exception(f'Could not persist data into {dest_table}')
-                time_run = datetime.timedelta(seconds=(time.time() - start_time))
-                logger.info(f'Processed {total_chunks} chunks'
-                            f' for a total of {total_rows} rows'
-                            f' for data entity {pipeline.name}'
-                            f' with a result of {result_rows} remaining rows'
-                            f' finished in {str(time_run)} seconds')
-                del chunk
-                pipeline_state = PipelineState(
-                    time_run=time_run,
-                    total_rows=total_rows,
-                    result_rows=result_rows,
-                    ad_client_id=ad_client_id,
-                    pipeline=pipeline
-                )
-                del df_iter
-                queue.put(pipeline_state)
+            for chunk in df_iter:
+                cleaned_chunk = pipeline_obj.clean_df(chunk)
+                result_rows += len(cleaned_chunk)
+                total_chunks = total_chunks + 1
+                total_rows += len(chunk.index)
+                if not db_api.copy_from_df(df=cleaned_chunk, table=dest_table):
+                    raise Exception(f'Could not persist data into {dest_table}')
+            time_run = datetime.timedelta(seconds=(time.time() - start_time))
+            logger.info(f'Processed {total_chunks} chunks'
+                        f' for a total of {total_rows} rows'
+                        f' for data entity {pipeline.name}'
+                        f' with a result of {result_rows} remaining rows'
+                        f' finished in {str(time_run)} seconds')
+            del chunk
+            pipeline_state = PipelineState(
+                time_run=time_run,
+                total_rows=total_rows,
+                result_rows=result_rows,
+                ad_client_id=ad_client_id,
+                pipeline=pipeline
+            )
+            del df_iter
+            queue.put(pipeline_state)
 
     @staticmethod
     def clear_aggregated_data(db_api: DB_Interface, ad_client_id: int):
@@ -282,7 +277,7 @@ class PipelineState:
                                                      client_state['terms_remaining_percent'] +
                                                      client_state['payments_remaining_percent']) / 4
 
-            insert = f'INSERT INTO machine_learning.data_cleaning_client_stats ' \
+            insert = f'INSERT INTO {DATA_CLEANING_SCHEMA}.data_cleaning_client_stats ' \
                      f'(ad_client_id, runtime_in_seconds, no_entries_invoices,' \
                      f' no_entries_alloc, no_entries_payments, no_entries_terms,' \
                      f' no_clean_entries_invoices, no_clean_entries_alloc, no_clean_entries_payments,' \

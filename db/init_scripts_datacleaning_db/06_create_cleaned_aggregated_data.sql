@@ -1,4 +1,4 @@
-CREATE TABLE machine_learning.cleaned_aggregated_data
+CREATE TABLE cashflow_forecast.cleaned_aggregated_data
 (
     id                               BIGSERIAL PRIMARY KEY,
     ad_client_id                     bigint                       not null,
@@ -58,6 +58,6 @@ CREATE TABLE machine_learning.cleaned_aggregated_data
     std_late_unpaid                  numeric
 );
 
-CREATE INDEX ad_client_idx ON machine_learning.cleaned_aggregated_data (ad_client_id);
+CREATE INDEX ad_client_idx ON cashflow_forecast.cleaned_aggregated_data (ad_client_id);
 
-CREATE INDEX c_bpartner_idx ON machine_learning.cleaned_aggregated_data (c_bpartner_id)
+CREATE INDEX c_bpartner_idx ON cashflow_forecast.cleaned_aggregated_data (c_bpartner_id)

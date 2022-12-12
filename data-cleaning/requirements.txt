@@ -3,5 +3,4 @@ Numpy~=1.21.2
 PyYAML~=5.4
 SQLAlchemy~=1.4.23
 psycopg2~=2.9.2
-sentry~=22.5.0
-loggly-python-handler~=1.0.1
+watchtower~=3.0.0

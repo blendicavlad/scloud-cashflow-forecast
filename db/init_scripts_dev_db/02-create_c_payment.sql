@@ -1,4 +1,4 @@
-create table machine_learning.c_payment
+create table cashflow_forecast.c_payment
 (
     c_payment_id                   bigint                                       not null
         constraint pk335

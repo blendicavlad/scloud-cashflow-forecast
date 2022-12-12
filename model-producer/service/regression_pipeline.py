@@ -10,7 +10,6 @@ from sklearn.linear_model import Lasso, LassoCV
 from sklearn.metrics import mean_squared_error
 from datetime import timedelta
 from pandas import DataFrame
-from sentry_sdk import start_span
 import time
 import datetime
 
@@ -64,24 +63,16 @@ class RegressionPipeline(MLPipeline):
         logger.info(f'Started regression pipeline for client: {self.ad_client_id}')
         try:
             x_train, y_train, x_test, y_test = self.split_for_test()
-            with start_span(op="regression_evaluation", description="Regression evaluation") as span:
-                start_time = time.time()
-                model_for_test, _ = self.build_model(x_train, y_train)
-                span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
-                test_mse, test_r2 = self.test_model(model_for_test, x_train, y_train, x_test, y_test)
-                span.set_data('ad_client_id', self.ad_client_id)
+            model_for_test, _ = self.build_model(x_train, y_train)
+            test_mse, test_r2 = self.test_model(model_for_test, x_train, y_train, x_test, y_test)
         except Exception as e:
             logger.error('Unable to test model: ' + str(e))
             test_mse = None
             test_r2 = None
 
-        with start_span(op="regression_model_building", description="Regression model building") as span:
-            start_time = time.time()
-            generated_model, train_r2 = self.build_model(*self.split_for_train())
-            self.persist_model(generated_model)
-            logger.info('Regression model persisted successfully')
-            span.set_data('seconds_run', str(datetime.timedelta(seconds=(time.time() - start_time))))
-            span.set_data('ad_client_id', self.ad_client_id)
+        generated_model, train_r2 = self.build_model(*self.split_for_train())
+        self.persist_model(generated_model)
+        logger.info('Regression model persisted successfully')
 
         self.log_regression_results(test_mse, test_r2, train_r2)
 
