@@ -1,9 +1,9 @@
-from typing import Hashable, Any, Union
+from typing import Hashable, Any, Union, Dict
 
 import yaml
 
 
-def read_yaml(filename: str) -> Union[dict[Hashable, Any], list, None]:
+def read_yaml(filename: str) -> Union[Dict[Hashable, Any], list, None]:
     with open(filename, "r") as stream:
         try:
             return yaml.safe_load(stream)

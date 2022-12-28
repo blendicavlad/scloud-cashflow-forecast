@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import watchtower
 
 import yaml
 from logging.config import dictConfig
@@ -33,10 +32,7 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_k
     :param env_key: env key for log file
     """
     path = default_path
-    env_path = None
-    if env_key is None:
-        env_path = None
-    else:
+    if env_key is not None:
         env_path = os.getenv(env_key, None)
         if env_path:
             path = env_path
@@ -52,10 +48,6 @@ def setup_logging(default_path='logging.yaml', default_level=logging.INFO, env_k
     else:
         logging.basicConfig(level=default_level)
         print('Failed to load configuration file. Using default configs')
-    logger = logging.getLogger('modelProducerLog')
-    logger.addHandler(
-        watchtower.CloudWatchLogHandler(log_group_name=os.environ.get('LOG_GROUP'),
-                                        log_stream_name=os.environ.get('LOG_STREAM')))
     set_boto3_logging()
     logging.getLogger('matplotlib').setLevel(logging.INFO)
     logging.getLogger('matplotlib.font_manager').disabled = True

@@ -3,4 +3,3 @@ PyYAML~=5.4
 psycopg2-binary~=2.9.2
 scikit-learn==1.1.1
 boto3~=1.13.16
-watchtower~=3.0.0

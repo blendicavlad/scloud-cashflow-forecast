@@ -5,27 +5,8 @@ formatters:
     format: "[%(asctime)s] %(process)d %(levelname)s %(name)s:%(funcName)s:%(lineno)s - %(message)s"
   plaintext:
     format: "[%(asctime)s] %(process)d %(levelname)s %(name)s:%(funcName)s:%(lineno)s - %(message)s"
-handlers:
-  console:
-    class: logging.StreamHandler
-    formatter: plaintext
-    level: DEBUG
-    stream: ext://sys.stdout
-  watchtower:
-    class: watchtower.CloudWatchLogHandler
-    formatter: json
-    level: DEBUG
-    log_group_name: watchtower
-    log_stream_name: "{logger_name}-{strftime:%y-%m-%d}"
-    send_interval: 10
-    create_log_group: False
-root:
-  level: DEBUG
-  propagate: True
-  handlers: [console, watchtower]
 loggers:
   modelConsumerLog:
-    andlers: [console, watchtower]
     level: INFO
   botocore:
     level: INFO

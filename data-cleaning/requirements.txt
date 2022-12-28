@@ -3,4 +3,3 @@ Numpy~=1.21.2
 PyYAML~=5.4
 SQLAlchemy~=1.4.23
 psycopg2~=2.9.2
-watchtower~=3.0.0

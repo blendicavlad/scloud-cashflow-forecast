@@ -15,24 +15,16 @@ handlers:
     class: logging.handlers.RotatingFileHandler
     formatter: plaintext
     level: DEBUG
-    filename: tmp/watchtower.log
-    maxBytes: 1000000
-    backupCount: 3
-  watchtower:
-    class: watchtower.CloudWatchLogHandler
-    formatter: json
-    level: DEBUG
-    log_group_name: watchtower
-    log_stream_name: "{logger_name}-{strftime:%y-%m-%d}"
-    send_interval: 10
-    create_log_group: False
+    filename: tmp/staticlog.log
+    maxBytes: 10000
+    backupCount: 1
 root:
   level: DEBUG
   propagate: True
-  handlers: [console, logfile, watchtower]
+  handlers: [console, logfile]
 loggers:
   appLog:
-    andlers: [console, logfile, watchtower]
+    andlers: [console, logfile]
     level: INFO
   botocore:
     level: INFO

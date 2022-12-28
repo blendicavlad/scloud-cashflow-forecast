@@ -45,12 +45,7 @@ def get_most_recent_model_for_client(ad_client_id, model_type: ModelType, bucket
         model_directory = 'classification_models'
     else:
         raise Exception('Not implemented')
-    session = boto3.Session(
-        aws_access_key_id=os.environ.get('aws_access_key_id'),
-        aws_secret_access_key=os.environ.get('aws_secret_access_key'),
-        aws_session_token=os.environ.get('aws_session_token')
-    )
-    s3_client = session.client('s3')
+    s3_client = boto3.client('s3')
     paginator = s3_client.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket_name,
                                        Prefix=f'{_ml_models_bucket_key}/{model_directory}/{ad_client_id}')

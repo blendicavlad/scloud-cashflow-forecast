@@ -2,37 +2,31 @@ version: '3'
 
 services:
   data-cleaning:
-    container_name: data-cleaning-prod
+    container_name: data-cleaning
     build:
       context: ./data-cleaning
       dockerfile: Dockerfile
     volumes:
       - ./data-cleaning:/app
-    env_file:
-      - env/data-cleaning/prod.env
 
   model-consumer:
-    container_name: model-consumer-prod
+    container_name: model-consumer
     build:
       context: ./model-consumer
       dockerfile: Dockerfile
     ports:
       - "9000:8080"
-    env_file:
-      - ./env/model-consumer/prod.env
     volumes:
       - ./model-consumer:/app
     tmpfs:
       - /tmp
 
   model-producer:
-    container_name: model-producer-prod
+    container_name: model-producer
     build:
       context: ./model-producer
       dockerfile: Dockerfile
     volumes:
       - ./model-producer:/app
-    env_file:
-      - env/model-producer/prod.env
     tmpfs:
       - /tmp

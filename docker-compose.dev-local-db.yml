@@ -2,7 +2,7 @@ version: '3'
 
 services:
   data-cleaning-dev:
-    container_name: data-cleaning
+    container_name: data-cleaning-dev-local
     build:
       context: ./data-cleaning
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
       - app-network
 
   model-consumer-dev:
-    container_name: model-consumer
+    container_name: model-consumer-dev-local
     build:
       context: ./model-consumer
       dockerfile: Dockerfile
@@ -35,7 +35,7 @@ services:
       - app-network
 
   model-producer-dev:
-    container_name: model-producer
+    container_name: model-producer-dev-local
     build:
       context: ./model-producer
       dockerfile: Dockerfile

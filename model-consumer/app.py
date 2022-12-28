@@ -1,4 +1,6 @@
 import json
+import os
+import traceback
 
 import service.prediction_service
 from utils import log
@@ -10,17 +12,26 @@ log.setup_logging()
 logger = logging.getLogger('modelConsumerLog')
 
 def handler(event, context):
-    ad_client_id = event["ad_client_id"]
-    if ad_client_id is None or ad_client_id == 0:
+    try:
+        ad_client_id = event["ad_client_id"]
+    except KeyError:
         return {
             'status' : 400,
             'message': 'ad_client_id is mandatory in JSON body'
         }
-    df = pd.DataFrame(event["Input"])
+
+    try:
+        df = pd.DataFrame(event["Input"])
+    except KeyError:
+        return {
+            'status' : 400,
+            'message': 'ad_client_id is mandatory in JSON body'
+        }
+
     if df.empty:
         return {
-            'status' : 200,
-            'message': 'No data received for prediction'
+            'status' : 400,
+            'message': 'Input is mandatory in JSON body'
         }
     try:
         logger.info(f'Received prediction request for client: {ad_client_id}')
@@ -29,6 +40,8 @@ def handler(event, context):
         return parsed_data
     except service.prediction_service.ClientException as e:
         logger.info(f'Unable to run prediction for client: {ad_client_id}, cause: {str(e)}')
+        if bool(os.environ.get('DEBUG')):
+            logger.error(traceback.format_exc())
         return {
             'status': 200,
             'message': str(e)

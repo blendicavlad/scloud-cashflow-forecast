@@ -1,11 +1,14 @@
 import psycopg2
 import logging
-import time
 
 logger = logging.getLogger('modelConsumerLog')
 
-LIMIT_RETRIES = 5
+LIMIT_RETRIES = 3
 
+class DBConnectionException(Exception):
+    def __init__(self):
+        super().__init__('Database connection error')
+    pass
 
 class DB:
 
@@ -35,18 +38,19 @@ class DB:
                                                      user=self.__user,
                                                      password=self.__password,
                                                      host=self.__host,
-                                                     port=self.__port)
+                                                     port=self.__port,
+                                                     connect_timeout=5)
                 retry_counter = 0
             except psycopg2.OperationalError as err:
                 if retry_counter >= LIMIT_RETRIES:
                     raise err
                 else:
                     retry_counter += 1
-                    logger.error("got error {}. reconnecting {}".format(str(err).strip(), retry_counter))
-                    time.sleep(5)
+                    logger.error("got error: {}. reconnecting {}".format(str(err).strip(), retry_counter))
                     return self.connect(retry_counter)
             except (Exception, psycopg2.Error) as err:
-                raise err
+                logger.error(err)
+                raise DBConnectionException()
         return self.__connection
 
     def cursor(self):
